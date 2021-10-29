@@ -5,6 +5,7 @@ import (
 	"../labrpc"
 	"fmt"
 	"strconv"
+	"encoding/json"
 )
 
 // Cluster consists of a group of nodes to manage distributed tables defined in models/table.go.
@@ -106,9 +107,15 @@ func (c* Cluster) Join(tableNames []string, reply *Dataset) {
 }
 
 func (c* Cluster) BuildTable(params []interface{}, reply *string) {
-	//schema := params[0]
-	//rules := params[1]
+	schema := params[0].(TableSchema)
+	rules := params[1].([]uint8)
+	fmt.Println("Schema name: ", schema.TableName)
+	fmt.Println("Schema ColumnSchemas: ", schema.ColumnSchemas)
+	fmt.Println("rules = ", string(rules))
 
+	var jsonrules map[string](map[string]interface{})
+	json.Unmarshal([]uint8(rules), &jsonrules)
+	fmt.Println("jsonrules['0']['column'] = ", jsonrules["0"]["column"])
 }
 
 func (c* Cluster) FragmentWrite(params []interface{}, reply *string) {
