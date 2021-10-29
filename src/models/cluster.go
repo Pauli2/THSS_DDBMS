@@ -1,11 +1,12 @@
 package models
 
 import (
-	"../labgob"
-	"../labrpc"
+	"encoding/json"
 	"fmt"
 	"strconv"
-	"encoding/json"
+
+	"../labgob"
+	"../labrpc"
 )
 
 // Cluster consists of a group of nodes to manage distributed tables defined in models/table.go.
@@ -102,11 +103,11 @@ func (c *Cluster) SayHello(visitor string, reply *string) {
 
 // Join all tables in the given list using NATURAL JOIN (join on the common columns), and return the joined result
 // as a list of rows and set it to reply.
-func (c* Cluster) Join(tableNames []string, reply *Dataset) {
+func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 	//TODO lab2
 }
 
-func (c* Cluster) BuildTable(params []interface{}, reply *string) {
+func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	schema := params[0].(TableSchema)
 	rules := params[1].([]uint8)
 	fmt.Println("Schema name: ", schema.TableName)
@@ -115,10 +116,34 @@ func (c* Cluster) BuildTable(params []interface{}, reply *string) {
 
 	var jsonrules map[string](map[string]interface{})
 	json.Unmarshal([]uint8(rules), &jsonrules)
-	fmt.Println("jsonrules['0']['column'] = ", jsonrules["0"]["column"])
+	//fmt.Println("jsonrules['0']['column'] = ", jsonrules["0"]["column"])
+	//fmt.Println(reflect.TypeOf(jsonrules["0"]["column"]))
+
+	for index, rules := range jsonrules {
+		//fmt.Println(index, rules)
+		var columns []ColumnSchema
+		rule_columns, ok := rules["column"].([]interface{})
+		if ok {
+			for _, column_name := range rule_columns {
+				for _, column := range schema.ColumnSchemas {
+					if column.Name == column_name {
+						columns = append(columns, column)
+					}
+				}
+			}
+			table_schema := TableSchema{
+				TableName:     "Table" + index,
+				ColumnSchemas: columns,
+			}
+
+			//TODO: Create a node and a table, using table_schema
+			fmt.Println("table schema: ", table_schema)
+		}
+
+	}
 }
 
-func (c* Cluster) FragmentWrite(params []interface{}, reply *string) {
+func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 	//tableName := params[0]
 	//row := params[1]
 
