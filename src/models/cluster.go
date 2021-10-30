@@ -110,17 +110,26 @@ func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	schema := params[0].(TableSchema)
 	rules := params[1].([]uint8)
-	fmt.Println("Schema name: ", schema.TableName)
-	fmt.Println("Schema ColumnSchemas: ", schema.ColumnSchemas)
-	fmt.Println("rules = ", string(rules))
+	// fmt.Println("Schema name: ", schema.TableName)
+	// fmt.Println("Schema ColumnSchemas: ", schema.ColumnSchemas)
+	// fmt.Println("rules = ", string(rules))
 
 	var jsonrules map[string](map[string]interface{})
 	json.Unmarshal([]uint8(rules), &jsonrules)
-	//fmt.Println("jsonrules['0']['column'] = ", jsonrules["0"]["column"])
-	//fmt.Println(reflect.TypeOf(jsonrules["0"]["column"]))
+	// fmt.Println("jsonrules['0']['column'] = ", jsonrules["0"]["column"])
+	// fmt.Println(reflect.TypeOf(jsonrules["0"]["column"]))
 
 	for index, rules := range jsonrules {
 		//fmt.Println(index, rules)
+		intinddex, _ := strconv.Atoi(index)
+		fmt.Println(c.nodeIds[intinddex])
+
+		endName := "PROJ" + c.nodeIds[intinddex]
+		fmt.Println(endName)
+		end := c.network.MakeEnd(endName)
+		c.network.Connect(endName, c.nodeIds[intinddex])
+		c.network.Enable(endName, true)
+
 		var columns []ColumnSchema
 		rule_columns, ok := rules["column"].([]interface{})
 		if ok {
@@ -131,13 +140,15 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 					}
 				}
 			}
-			table_schema := TableSchema{
-				TableName:     "Table" + index,
+			projtableschema := TableSchema{
+				TableName: "PROJ" + index,
 				ColumnSchemas: columns,
 			}
-
 			//TODO: Create a node and a table, using table_schema
-			fmt.Println("table schema: ", table_schema)
+			fmt.Println("table schema: ", projtableschema)
+			*reply = ""
+			end.Call("Node.CallCreateTable", &projtableschema, reply)
+			fmt.Println("reply = ", *reply)
 		}
 
 	}
