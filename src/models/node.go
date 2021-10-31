@@ -42,6 +42,15 @@ func (n *Node) CreateTable(schema *TableSchema) error {
 	return nil
 }
 
+func (n *Node) CallCreateTable(schema *TableSchema, reply *string) {
+	err := n.CreateTable(schema)
+	if err == nil {
+		*reply = "create table sucessfully"
+	} else {
+		*reply = "table already exists"
+	}
+}
+
 // Insert inserts a row into the specified table, and returns nil if succeeds or an error if the table does not exist.
 func (n *Node) Insert(tableName string, row *Row) error {
 	if t, ok := n.TableMap[tableName]; ok {
