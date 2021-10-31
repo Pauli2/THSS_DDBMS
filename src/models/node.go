@@ -11,7 +11,7 @@ type Node struct {
 	Identifier string
 	// tableName -> table
 	TableMap map[string]*Table
-	Constrain map[string](map[string]interface{})
+	Constrain map[string][]uint8
 }
 
 // NewNode creates a new node with the given name and an empty set of tables
@@ -52,14 +52,25 @@ func (n *Node) CallCreateTable(schema *TableSchema, reply *string) {
 	}
 }
 
+func (n *Node) ReadConstrain(tableName string, ruleback *[]uint8) {
+	if _, ok := n.Constrain[tableName]; ok {
+		fmt.Println("read constrain of " + tableName + " successfully")
+		*ruleback =  n.Constrain[tableName]
+	} else {
+		fmt.Println("table " + tableName + " does not exsit")
+	}
+}
+
 func (n *Node) UpdateConstrain(tableinfo []interface{}, reply *string) {
 	// fmt.Println(tableinfo)
 	tableName := tableinfo[0].(string)
 	tablerules := tableinfo[1].([]uint8)
-	fmt.Println(tablerules)
+	fmt.Println("tablerules = ", tablerules)
 	if _, ok := n.TableMap[tableName]; ok {
 		*reply = "update constrain of table " + tableName + " successfully"
-		// n.Constrain[tableName] = tablerules
+		fmt.Printf("n.Constrain[tableName] : %v\n", n.Constrain[tableName])
+		fmt.Printf("tablerules : %v\n", tablerules)
+		n.Constrain[tableName] = tablerules
 	} else {
 		*reply = "table " + tableName + " does not exsit"
 	}
