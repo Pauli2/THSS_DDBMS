@@ -11,6 +11,7 @@ type Node struct {
 	Identifier string
 	// tableName -> table
 	TableMap map[string]*Table
+	Constrain map[string](map[string]interface{})
 }
 
 // NewNode creates a new node with the given name and an empty set of tables
@@ -48,6 +49,19 @@ func (n *Node) CallCreateTable(schema *TableSchema, reply *string) {
 		*reply = "create table sucessfully"
 	} else {
 		*reply = "table already exists"
+	}
+}
+
+func (n *Node) UpdateConstrain(tableinfo []interface{}, reply *string) {
+	// fmt.Println(tableinfo)
+	tableName := tableinfo[0].(string)
+	tablerules := tableinfo[1].([]uint8)
+	fmt.Println(tablerules)
+	if _, ok := n.TableMap[tableName]; ok {
+		*reply = "update constrain of table " + tableName + " successfully"
+		// n.Constrain[tableName] = tablerules
+	} else {
+		*reply = "table " + tableName + " does not exsit"
 	}
 }
 
