@@ -155,6 +155,10 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 			*reply = ""
 			end.Call("Node.UpdateConstrain", []interface{}{projtableschema.TableName, rulecoef}, &reply)
 			fmt.Println("reply = ", *reply)
+			
+			var ruleback *[]uint8
+			end.Call("Node.ReadConstrain", projtableschema.TableName, &ruleback)
+			fmt.Println("ruleback = ", *ruleback)
 		}
 	}
 }
