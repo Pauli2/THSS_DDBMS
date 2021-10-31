@@ -119,7 +119,7 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	// fmt.Println("jsonrules['0']['column'] = ", jsonrules["0"]["column"])
 	// fmt.Println(reflect.TypeOf(jsonrules["0"]["column"]))
 
-	for index, rules := range jsonrules {
+	for index, rule := range jsonrules {
 		//fmt.Println(index, rules)
 		intinddex, _ := strconv.Atoi(index)
 		fmt.Println(c.nodeIds[intinddex])
@@ -131,7 +131,7 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 		c.network.Enable(endName, true)
 
 		var columns []ColumnSchema
-		rule_columns, ok := rules["column"].([]interface{})
+		rule_columns, ok := rule["column"].([]interface{})
 		if ok {
 			for _, column_name := range rule_columns {
 				for _, column := range schema.ColumnSchemas {
@@ -145,12 +145,14 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 				ColumnSchemas: columns,
 			}
 			//TODO: Create a node and a table, using table_schema
-			fmt.Println("table schema: ", projtableschema)
+			fmt.Println("table schema name: ", projtableschema.TableName)
+			fmt.Printf("rule = %v\n", rule)
 			*reply = ""
 			end.Call("Node.CallCreateTable", &projtableschema, reply)
 			fmt.Println("reply = ", *reply)
+			end.Call("Node.UpdateConstrain", []interface{}{projtableschema.TableName, rule}, &reply)
+			fmt.Println("reply = ", *reply)
 		}
-
 	}
 }
 
