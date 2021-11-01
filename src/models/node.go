@@ -77,6 +77,18 @@ func (n *Node) UpdateConstrain(tableinfo []interface{}, reply *string) {
 	}
 }
 
+func (n *Node) CallInsert(params []interface{}, reply *string) {
+	tableName := params[0].(string)
+	row := params[1].(Row)
+
+	err := n.Insert(tableName, &row)
+	if err == nil {
+		*reply = "Insert into table sucessfully"
+	} else {
+		*reply = "Error when inserting"
+	}
+}
+
 // Insert inserts a row into the specified table, and returns nil if succeeds or an error if the table does not exist.
 func (n *Node) Insert(tableName string, row *Row) error {
 	if t, ok := n.TableMap[tableName]; ok {

@@ -256,10 +256,15 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 			maprow[schema.Name] = row[index]
 		}
 		fmt.Println("maprow: ", maprow)
+		reply := ""
 		
 		if satisfy(maprow, jsonrule["predicate"].(map[string]interface{})) {
 			//TODO: Insert into table
-			fmt.Println(1)
+			var rowToInsert Row
+			for _, column := range jsonrule["column"].([]interface{}) {
+				rowToInsert = append(rowToInsert, maprow[column.(string)])
+			}
+			end.Call("Node.CallInsert", []interface{}{tableName, rowToInsert}, &reply)
 		}
 	}
 }
