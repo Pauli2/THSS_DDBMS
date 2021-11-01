@@ -24,6 +24,7 @@ type Cluster struct {
 	network *labrpc.Network
 	// the Name of the cluster, also used as a network address of the cluster coordinator in the network above
 	Name string
+	TableSchemaMap map[string]TableSchema
 }
 
 // NewCluster creates a Cluster with the given number of nodes and register the nodes to the given network.
@@ -62,7 +63,7 @@ func NewCluster(nodeNum int, network *labrpc.Network, clusterName string) *Clust
 	}
 
 	// create a cluster with the nodes and the network
-	c := &Cluster{nodeIds: nodeIds, network: network, Name: clusterName}
+	c := &Cluster{nodeIds: nodeIds, network: network, Name: clusterName, TableSchemaMap: make(map[string]TableSchema)}
 	// create a coordinator for the cluster to receive external requests, the steps are similar to those above.
 	// notice that we use the reference of the cluster as the name of the coordinator server,
 	// and the names can be more than strings.
@@ -110,10 +111,12 @@ func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	schema := params[0].(TableSchema)
 	rules := params[1].([]uint8)
+	fmt.Println("\nBuilding Table...")
 	// fmt.Println("Schema name: ", schema.TableName)
 	// fmt.Println("Schema ColumnSchemas: ", schema.ColumnSchemas)
 	// fmt.Println("rules = ", string(rules))
 
+	c.TableSchemaMap[schema.TableName] = schema
 	var jsonrules map[string](map[string]interface{})
 	json.Unmarshal([]uint8(rules), &jsonrules)
 	// fmt.Println("jsonrules['0']['column'] = ", jsonrules["0"]["column"])
@@ -122,7 +125,7 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	for index, rule := range jsonrules {
 		//fmt.Println(index, rules)
 		intinddex, _ := strconv.Atoi(index)
-		fmt.Println(c.nodeIds[intinddex])
+		fmt.Println("\n", c.nodeIds[intinddex])
 
 		endName := "PROJ" + c.nodeIds[intinddex]
 		fmt.Println(endName)
@@ -141,7 +144,7 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 				}
 			}
 			projtableschema := TableSchema{
-				TableName: "PROJ" + index,
+				TableName: schema.TableName,
 				ColumnSchemas: columns,
 			}
 			//TODO: Create a node and a table, using table_schema
@@ -156,15 +159,37 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 			end.Call("Node.UpdateConstrain", []interface{}{projtableschema.TableName, rulecoef}, &reply)
 			fmt.Println("reply = ", *reply)
 			
-			var ruleback *[]uint8
-			end.Call("Node.ReadConstrain", projtableschema.TableName, &ruleback)
-			fmt.Println("ruleback = ", string(*ruleback))
+			//var ruleback *[]uint8
+			//end.Call("Node.ReadConstrain", projtableschema.TableName, &ruleback)
+			//fmt.Println("ruleback = ", string(*ruleback))
 		}
 	}
 }
 
 func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
-	//tableName := params[0]
-	//row := params[1]
+	tableName := params[0].(string)
+	row := params[1]
+	fmt.Println("\n FragmentWriting...")
+	fmt.Println("tableName: ", tableName)
+	fmt.Println("row: ", row)
 
+	fullSchema := c.TableSchemaMap[tableName].ColumnSchemas
+	fmt.Println("Full table schema: ", fullSchema)
+
+	for _, nodeId := range c.nodeIds {
+		endName := "FW" + nodeId
+		end := c.network.MakeEnd(endName)
+		c.network.Connect(endName, nodeId)
+		c.network.Enable(endName, true)
+
+		rule := []uint8{}
+		end.Call("Node.ReadConstrain", tableName, &rule)
+		var jsonrule map[string]interface{}
+		json.Unmarshal([]uint8(rule), &jsonrule)
+		fmt.Println("rule of node: ", jsonrule)
+
+
+		
+
+	}
 }
