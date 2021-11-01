@@ -165,6 +165,23 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	}
 }
 
+func numtrans(input interface{}) float64 {
+	if result, ok := input.(int); ok {
+		return float64(result)
+	}
+	if result, ok := input.(float32); ok {
+		return float64(result)
+	}
+	if result, ok := input.(float64); ok {
+		return result
+	}
+	if result, ok := input.(uint); ok {
+		return float64(result)
+	}
+	fmt.Println("Unexpected number type!")
+	return 0xFFFFFFFF
+}
+
 func numcompare(value float64, crivalue float64, op string) bool {
 	switch op {
 	case ">":
@@ -194,22 +211,18 @@ func strcompare(value string, crivalue string, op string) bool {
 }
 
 func satisfy(mapdata map[string]interface{}, condition map[string]interface{}) bool {
-	for field, expression := range condition {
-		value := mapdata[field]
-		if expression, ok := expression.(map[string]interface{}); ok {  // bug with expression!
-			crivalue := expression["val"]
-			op := expression["op"].(string)
-			if crivalue, ok := crivalue.(int); ok {
-				return numcompare(float64(value.(int)), float64(crivalue), op)
-			}
-			if crivalue, ok := crivalue.(float32); ok {
-				return numcompare(float64(value.(float32)), float64(crivalue), op)
-			}
-			if crivalue, ok := crivalue.(float64); ok {
-				return numcompare(value.(float64), crivalue, op)
-			}
-			if crivalue, ok := crivalue.(string); ok {
-				return strcompare(value.(string), crivalue, op)
+	for field, expressions := range condition {
+		for _, expression := range expressions.([]interface{}) {
+			value := mapdata[field]
+			exp := expression.(map[string]interface{})
+			fmt.Println(exp)
+			if expression, ok := expression.(map[string]interface{}); ok {  // bug with expression!
+				crivalue := expression["val"]
+				op := expression["op"].(string)
+				if crivalue, ok := crivalue.(string); ok {
+					return strcompare(value.(string), crivalue, op)
+				}
+				return numcompare(numtrans(value), numtrans(crivalue), op)
 			}
 		}
 	}
@@ -240,25 +253,13 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 
 		maprow := make(map[string]interface{})
 		for index, schema := range fullSchema {
-			/*
-			var attr interface{}
-			switch schema.DataType {
-			case 5:
-				attr = row[index].(string)
-			case 4:
-				attr = row[index].(bool)
-			default:
-				attr = row[index].(float64)
-			}
-			maprow[schema.Name] = attr
-			*/
 			maprow[schema.Name] = row[index]
 		}
 		fmt.Println("maprow: ", maprow)
 		
 		if satisfy(maprow, jsonrule["predicate"].(map[string]interface{})) {
-			fmt.Println(1)
 			//TODO: Insert into table
+			fmt.Println(1)
 		}
 	}
 }
