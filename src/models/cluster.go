@@ -219,10 +219,16 @@ func satisfy(mapdata map[string]interface{}, condition map[string]interface{}) b
 			if expression, ok := expression.(map[string]interface{}); ok {  // bug with expression!
 				crivalue := expression["val"]
 				op := expression["op"].(string)
-				if crivalue, ok := crivalue.(string); ok {
-					return strcompare(value.(string), crivalue, op)
+				crivalue_str, ok := crivalue.(string) 
+				if ok {
+					if !strcompare(value.(string), crivalue_str, op) {
+						return false
+					}
+				} else {
+					if !numcompare(numtrans(value), numtrans(crivalue), op) {
+						return false
+					}
 				}
-				return numcompare(numtrans(value), numtrans(crivalue), op)
 			}
 		}
 	}
@@ -233,11 +239,11 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 	tableName := params[0].(string)
 	row := params[1].(Row)
 	fmt.Println("\n FragmentWriting...")
-	fmt.Println("tableName: ", tableName)
+	//fmt.Println("tableName: ", tableName)
 	fmt.Println("row: ", row)
 
 	fullSchema := c.TableSchemaMap[tableName].ColumnSchemas
-	fmt.Println("Full table schema: ", fullSchema)
+	//fmt.Println("Full table schema: ", fullSchema)
 
 	for _, nodeId := range c.nodeIds {
 		endName := "FW" + nodeId
@@ -255,7 +261,7 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 		for index, schema := range fullSchema {
 			maprow[schema.Name] = row[index]
 		}
-		fmt.Println("maprow: ", maprow)
+		//fmt.Println("maprow: ", maprow)
 		reply := ""
 		
 		if satisfy(maprow, jsonrule["predicate"].(map[string]interface{})) {
