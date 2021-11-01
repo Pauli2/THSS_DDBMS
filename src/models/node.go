@@ -40,6 +40,7 @@ func (n *Node) CreateTable(schema *TableSchema) error {
 		NewMemoryListRowStore(),
 	)
 	n.TableMap[schema.TableName] = t
+	n.Constrain = make(map[string][]uint8)
 	return nil
 }
 
@@ -65,11 +66,11 @@ func (n *Node) UpdateConstrain(tableinfo []interface{}, reply *string) {
 	// fmt.Println(tableinfo)
 	tableName := tableinfo[0].(string)
 	tablerules := tableinfo[1].([]uint8)
-	fmt.Println("tablerules = ", tablerules)
+	fmt.Println("tablerules = ", string(tablerules))
 	if _, ok := n.TableMap[tableName]; ok {
 		*reply = "update constrain of table " + tableName + " successfully"
 		fmt.Printf("n.Constrain[tableName] : %v\n", n.Constrain[tableName])
-		fmt.Printf("tablerules : %v\n", tablerules)
+		fmt.Printf("tablerules : %v\n", string(tablerules))
 		n.Constrain[tableName] = tablerules
 	} else {
 		*reply = "table " + tableName + " does not exsit"

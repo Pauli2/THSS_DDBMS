@@ -158,7 +158,7 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 			
 			var ruleback *[]uint8
 			end.Call("Node.ReadConstrain", projtableschema.TableName, &ruleback)
-			fmt.Println("ruleback = ", *ruleback)
+			fmt.Println("ruleback = ", string(*ruleback))
 		}
 	}
 }
