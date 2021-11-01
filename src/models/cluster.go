@@ -134,8 +134,7 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 		c.network.Enable(endName, true)
 
 		var columns []ColumnSchema
-		rule_columns, ok := rule["column"].([]interface{})
-		if ok {
+		if rule_columns, ok := rule["column"].([]interface{}); ok {
 			for _, column_name := range rule_columns {
 				for _, column := range schema.ColumnSchemas {
 					if column.Name == column_name {
@@ -166,9 +165,60 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	}
 }
 
+func numcompare(value float64, crivalue float64, op string) bool {
+	switch op {
+	case ">":
+		return value > crivalue
+	case ">=":
+		return value >= crivalue
+	case "<=":
+		return value <= crivalue
+	case "<":
+		return value < crivalue
+	case "!=":
+		return value != crivalue
+	default:
+		return true
+	}
+}
+
+func strcompare(value string, crivalue string, op string) bool {
+	switch op {
+	case "!=":
+		return value != crivalue
+	case "==":
+		return value == crivalue
+	default:
+		return true
+	}
+}
+
+func satisfy(mapdata map[string]interface{}, condition map[string]interface{}) bool {
+	for field, expression := range condition {
+		value := mapdata[field]
+		if expression, ok := expression.(map[string]interface{}); ok {  // bug with expression!
+			crivalue := expression["val"]
+			op := expression["op"].(string)
+			if crivalue, ok := crivalue.(int); ok {
+				return numcompare(float64(value.(int)), float64(crivalue), op)
+			}
+			if crivalue, ok := crivalue.(float32); ok {
+				return numcompare(float64(value.(float32)), float64(crivalue), op)
+			}
+			if crivalue, ok := crivalue.(float64); ok {
+				return numcompare(value.(float64), crivalue, op)
+			}
+			if crivalue, ok := crivalue.(string); ok {
+				return strcompare(value.(string), crivalue, op)
+			}
+		}
+	}
+	return true
+}
+
 func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 	tableName := params[0].(string)
-	row := params[1]
+	row := params[1].(Row)
 	fmt.Println("\n FragmentWriting...")
 	fmt.Println("tableName: ", tableName)
 	fmt.Println("row: ", row)
@@ -188,8 +238,27 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 		json.Unmarshal([]uint8(rule), &jsonrule)
 		fmt.Println("rule of node: ", jsonrule)
 
-
+		maprow := make(map[string]interface{})
+		for index, schema := range fullSchema {
+			/*
+			var attr interface{}
+			switch schema.DataType {
+			case 5:
+				attr = row[index].(string)
+			case 4:
+				attr = row[index].(bool)
+			default:
+				attr = row[index].(float64)
+			}
+			maprow[schema.Name] = attr
+			*/
+			maprow[schema.Name] = row[index]
+		}
+		fmt.Println("maprow: ", maprow)
 		
-
+		if satisfy(maprow, jsonrule["predicate"].(map[string]interface{})) {
+			fmt.Println(1)
+			//TODO: Insert into table
+		}
 	}
 }
