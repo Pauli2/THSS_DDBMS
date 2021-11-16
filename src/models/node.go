@@ -11,6 +11,7 @@ type Node struct {
 	Identifier string
 	// tableName -> table
 	TableMap map[string]*Table
+	Constrain map[string][]uint8
 }
 
 // NewNode creates a new node with the given name and an empty set of tables
@@ -39,6 +40,7 @@ func (n *Node) CreateTable(schema *TableSchema) error {
 		NewMemoryListRowStore(),
 	)
 	n.TableMap[schema.TableName] = t
+	n.Constrain = make(map[string][]uint8)
 	return nil
 }
 

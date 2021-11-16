@@ -24,6 +24,7 @@ type Cluster struct {
 	network *labrpc.Network
 	// the Name of the cluster, also used as a network address of the cluster coordinator in the network above
 	Name string
+	TableSchemaMap map[string]TableSchema
 }
 
 // NewCluster creates a Cluster with the given number of nodes and register the nodes to the given network.
@@ -62,7 +63,7 @@ func NewCluster(nodeNum int, network *labrpc.Network, clusterName string) *Clust
 	}
 
 	// create a cluster with the nodes and the network
-	c := &Cluster{nodeIds: nodeIds, network: network, Name: clusterName}
+	c := &Cluster{nodeIds: nodeIds, network: network, Name: clusterName, TableSchemaMap: make(map[string]TableSchema)}
 	// create a coordinator for the cluster to receive external requests, the steps are similar to those above.
 	// notice that we use the reference of the cluster as the name of the coordinator server,
 	// and the names can be more than strings.
@@ -114,12 +115,13 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	// fmt.Println("Schema ColumnSchemas: ", schema.ColumnSchemas)
 	// fmt.Println("rules = ", string(rules))
 
+	c.TableSchemaMap[schema.TableName] = schema
 	var jsonrules map[string](map[string]interface{})
 	json.Unmarshal([]uint8(rules), &jsonrules)
 	// fmt.Println("jsonrules['0']['column'] = ", jsonrules["0"]["column"])
 	// fmt.Println(reflect.TypeOf(jsonrules["0"]["column"]))
 
-	for index, rules := range jsonrules {
+	for index, rule := range jsonrules {
 		//fmt.Println(index, rules)
 		intinddex, _ := strconv.Atoi(index)
 		fmt.Println(c.nodeIds[intinddex])
@@ -131,8 +133,7 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 		c.network.Enable(endName, true)
 
 		var columns []ColumnSchema
-		rule_columns, ok := rules["column"].([]interface{})
-		if ok {
+		if rule_columns, ok := rule["column"].([]interface{}); ok {
 			for _, column_name := range rule_columns {
 				for _, column := range schema.ColumnSchemas {
 					if column.Name == column_name {
@@ -151,11 +152,124 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 			fmt.Println("reply = ", *reply)
 		}
 
+			rulecoef, _ := json.Marshal(rule)
+			*reply = ""
+			end.Call("Node.UpdateConstrain", []interface{}{projtableschema.TableName, rulecoef}, &reply)
+			fmt.Println("reply = ", *reply)
+			
+			//var ruleback *[]uint8
+			//end.Call("Node.ReadConstrain", projtableschema.TableName, &ruleback)
+			//fmt.Println("ruleback = ", string(*ruleback))
+		}
 	}
 }
 
-func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
-	//tableName := params[0]
-	//row := params[1]
+func numtrans(input interface{}) float64 {
+	if result, ok := input.(int); ok {
+		return float64(result)
+	}
+	if result, ok := input.(float32); ok {
+		return float64(result)
+	}
+	if result, ok := input.(float64); ok {
+		return result
+	}
+	if result, ok := input.(uint); ok {
+		return float64(result)
+	}
+	fmt.Println("Unexpected number type!")
+	return 0xFFFFFFFF
+}
 
+func numcompare(value float64, crivalue float64, op string) bool {
+	switch op {
+	case ">":
+		return value > crivalue
+	case ">=":
+		return value >= crivalue
+	case "<=":
+		return value <= crivalue
+	case "<":
+		return value < crivalue
+	case "!=":
+		return value != crivalue
+	default:
+		return true
+	}
+}
+
+func strcompare(value string, crivalue string, op string) bool {
+	switch op {
+	case "!=":
+		return value != crivalue
+	case "==":
+		return value == crivalue
+	default:
+		return true
+	}
+}
+
+func satisfy(mapdata map[string]interface{}, condition map[string]interface{}) bool {
+	for field, expressions := range condition {
+		for _, expression := range expressions.([]interface{}) {
+			value := mapdata[field]
+			exp := expression.(map[string]interface{})
+			fmt.Println(exp)
+			if expression, ok := expression.(map[string]interface{}); ok {  // bug with expression!
+				crivalue := expression["val"]
+				op := expression["op"].(string)
+				crivalue_str, ok := crivalue.(string) 
+				if ok {
+					if !strcompare(value.(string), crivalue_str, op) {
+						return false
+					}
+				} else {
+					if !numcompare(numtrans(value), numtrans(crivalue), op) {
+						return false
+					}
+				}
+			}
+		}
+	}
+	return true
+}
+
+func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
+	tableName := params[0].(string)
+	row := params[1].(Row)
+	fmt.Println("\n FragmentWriting...")
+	//fmt.Println("tableName: ", tableName)
+	fmt.Println("row: ", row)
+
+	fullSchema := c.TableSchemaMap[tableName].ColumnSchemas
+	//fmt.Println("Full table schema: ", fullSchema)
+
+	for _, nodeId := range c.nodeIds {
+		endName := "FW" + nodeId
+		end := c.network.MakeEnd(endName)
+		c.network.Connect(endName, nodeId)
+		c.network.Enable(endName, true)
+
+		rule := []uint8{}
+		end.Call("Node.ReadConstrain", tableName, &rule)
+		var jsonrule map[string]interface{}
+		json.Unmarshal([]uint8(rule), &jsonrule)
+		fmt.Println("rule of node: ", jsonrule)
+
+		maprow := make(map[string]interface{})
+		for index, schema := range fullSchema {
+			maprow[schema.Name] = row[index]
+		}
+		//fmt.Println("maprow: ", maprow)
+		reply := ""
+		
+		if satisfy(maprow, jsonrule["predicate"].(map[string]interface{})) {
+			//TODO: Insert into table
+			var rowToInsert Row
+			for _, column := range jsonrule["column"].([]interface{}) {
+				rowToInsert = append(rowToInsert, maprow[column.(string)])
+			}
+			end.Call("Node.CallInsert", []interface{}{tableName, rowToInsert}, &reply)
+		}
+	}
 }
