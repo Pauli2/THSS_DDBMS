@@ -53,6 +53,42 @@ func (n *Node) CallCreateTable(schema *TableSchema, reply *string) {
 	}
 }
 
+func (n *Node) ReadConstrain(tableName string, ruleback *[]uint8) {
+	if _, ok := n.Constrain[tableName]; ok {
+		fmt.Println("read constrain of " + tableName + " successfully")
+		*ruleback =  n.Constrain[tableName]
+	} else {
+		fmt.Println("table " + tableName + " does not exsit")
+	}
+}
+
+func (n *Node) UpdateConstrain(tableinfo []interface{}, reply *string) {
+	// fmt.Println(tableinfo)
+	tableName := tableinfo[0].(string)
+	tablerules := tableinfo[1].([]uint8)
+	fmt.Println("tablerules = ", string(tablerules))
+	if _, ok := n.TableMap[tableName]; ok {
+		*reply = "update constrain of table " + tableName + " successfully"
+		fmt.Printf("n.Constrain[tableName] : %v\n", n.Constrain[tableName])
+		fmt.Printf("tablerules : %v\n", string(tablerules))
+		n.Constrain[tableName] = tablerules
+	} else {
+		*reply = "table " + tableName + " does not exsit"
+	}
+}
+
+func (n *Node) CallInsert(params []interface{}, reply *string) {
+	tableName := params[0].(string)
+	row := params[1].(Row)
+
+	err := n.Insert(tableName, &row)
+	if err == nil {
+		*reply = "Insert into table sucessfully"
+	} else {
+		*reply = "Error when inserting"
+	}
+}
+
 // Insert inserts a row into the specified table, and returns nil if succeeds or an error if the table does not exist.
 func (n *Node) Insert(tableName string, row *Row) error {
 	if t, ok := n.TableMap[tableName]; ok {

@@ -150,7 +150,6 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 			*reply = ""
 			end.Call("Node.CallCreateTable", &projtableschema, reply)
 			fmt.Println("reply = ", *reply)
-		}
 
 			rulecoef, _ := json.Marshal(rule)
 			*reply = ""
