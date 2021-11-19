@@ -269,8 +269,10 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 		if satisfy(maprow, jsonrule["predicate"]) {
 			//TODO: Insert into table
 			var rowToInsert Row
-			for _, column := range jsonrule["column"].([]interface{}) {
-				rowToInsert = append(rowToInsert, maprow[column.(string)])
+			if rule_temp, ok := jsonrule["column"].([]interface{}); ok {
+				for _, column := range rule_temp {
+					rowToInsert = append(rowToInsert, maprow[column.(string)])
+				}
 			}
 			end.Call("Node.CallInsert", []interface{}{tableName, rowToInsert}, &reply)
 		}
