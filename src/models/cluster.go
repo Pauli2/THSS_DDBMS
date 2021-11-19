@@ -210,23 +210,25 @@ func strcompare(value string, crivalue string, op string) bool {
 	}
 }
 
-func satisfy(mapdata map[string]interface{}, condition map[string]interface{}) bool {
-	for field, expressions := range condition {
-		for _, expression := range expressions.([]interface{}) {
-			value := mapdata[field]
-			exp := expression.(map[string]interface{})
-			fmt.Println(exp)
-			if expression, ok := expression.(map[string]interface{}); ok {  // bug with expression!
-				crivalue := expression["val"]
-				op := expression["op"].(string)
-				crivalue_str, ok := crivalue.(string) 
-				if ok {
-					if !strcompare(value.(string), crivalue_str, op) {
-						return false
-					}
-				} else {
-					if !numcompare(numtrans(value), numtrans(crivalue), op) {
-						return false
+func satisfy(mapdata map[string]interface{}, condition interface{}) bool {
+	if condition, ok := condition.(map[string]interface{}); ok{
+		for field, expressions := range condition {
+			for _, expression := range expressions.([]interface{}) {
+				value := mapdata[field]
+				exp := expression.(map[string]interface{})
+				fmt.Println(exp)
+				if expression, ok := expression.(map[string]interface{}); ok {
+					crivalue := expression["val"]
+					op := expression["op"].(string)
+					crivalue_str, ok := crivalue.(string) 
+					if ok {
+						if !strcompare(value.(string), crivalue_str, op) {
+							return false
+						}
+					} else {
+						if !numcompare(numtrans(value), numtrans(crivalue), op) {
+							return false
+						}
 					}
 				}
 			}
@@ -253,7 +255,7 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 
 		rule := []uint8{}
 		end.Call("Node.ReadConstrain", tableName, &rule)
-		var jsonrule map[string]interface{}
+		jsonrule := make(map[string]interface{})
 		json.Unmarshal([]uint8(rule), &jsonrule)
 		fmt.Println("rule of node: ", jsonrule)
 
@@ -264,7 +266,7 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 		//fmt.Println("maprow: ", maprow)
 		reply := ""
 		
-		if satisfy(maprow, jsonrule["predicate"].(map[string]interface{})) {
+		if satisfy(maprow, jsonrule["predicate"]) {
 			//TODO: Insert into table
 			var rowToInsert Row
 			for _, column := range jsonrule["column"].([]interface{}) {
