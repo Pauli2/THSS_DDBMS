@@ -47,16 +47,19 @@ func (n *Node) CreateTable(schema *TableSchema) error {
 func (n *Node) CallCreateTable(schema *TableSchema, reply *string) {
 	err := n.CreateTable(schema)
 	if err == nil {
-		*reply = "create table sucessfully"
+		*reply = "create table " + schema.TableName + " sucessfully"
 	} else {
-		*reply = "table already exists"
+		*reply = "table " + schema.TableName + " already exists"
 	}
 }
 
 func (n *Node) ReadConstrain(tableName string, ruleback *[]uint8) {
 	if _, ok := n.Constrain[tableName]; ok {
 		fmt.Println("read constrain of " + tableName + " successfully")
-		*ruleback =  n.Constrain[tableName]
+		// fmt.Printf("n.Constrain[tableName] : %v\n", string(n.Constrain[tableName]))
+		// fmt.Printf("type of ruleback: %T\n", ruleback)
+		// fmt.Printf("type of constrain: %T\n", n.Constrain[tableName])
+		*ruleback = n.Constrain[tableName]
 	} else {
 		fmt.Println("table " + tableName + " does not exsit")
 	}
@@ -68,10 +71,10 @@ func (n *Node) UpdateConstrain(tableinfo []interface{}, reply *string) {
 	tablerules := tableinfo[1].([]uint8)
 	fmt.Println("tablerules = ", string(tablerules))
 	if _, ok := n.TableMap[tableName]; ok {
-		*reply = "update constrain of table " + tableName + " successfully"
-		fmt.Printf("n.Constrain[tableName] : %v\n", n.Constrain[tableName])
-		fmt.Printf("tablerules : %v\n", string(tablerules))
 		n.Constrain[tableName] = tablerules
+		*reply = "update constrain of table " + tableName + " successfully"
+		// fmt.Printf("n.Constrain[tableName] : %v\n", string(n.Constrain[tableName]))
+		// fmt.Printf("tablerules : %v\n", string(tablerules))
 	} else {
 		*reply = "table " + tableName + " does not exsit"
 	}
