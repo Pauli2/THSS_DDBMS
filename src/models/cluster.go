@@ -111,9 +111,8 @@ func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	schema := params[0].(TableSchema)
 	rules := params[1].([]uint8)
-	fmt.Println("\nBuilding Table...")
-	// fmt.Println("Schema name: ", schema.TableName)
-	// fmt.Println("Schema ColumnSchemas: ", schema.ColumnSchemas)
+	fmt.Println("Table name: ", schema.TableName)
+	fmt.Println("Table ColumnSchemas: ", schema.ColumnSchemas)
 	// fmt.Println("rules = ", string(rules))
 
 	c.TableSchemaMap[schema.TableName] = schema
@@ -123,11 +122,11 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	// fmt.Println(reflect.TypeOf(jsonrules["0"]["column"]))
 
 	for index, rule := range jsonrules {
-		//fmt.Println(index, rules)
+		// fmt.Println("index = ", index)
 		intinddex, _ := strconv.Atoi(index)
-		fmt.Println("\n", c.nodeIds[intinddex])
+		fmt.Println(c.nodeIds[intinddex])
 
-		endName := "PROJ" + c.nodeIds[intinddex]
+		endName := schema.TableName + c.nodeIds[intinddex]
 		fmt.Println(endName)
 		end := c.network.MakeEnd(endName)
 		c.network.Connect(endName, c.nodeIds[intinddex])
@@ -143,12 +142,12 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 				}
 			}
 			projtableschema := TableSchema{
+				// TableName: schema.TableName + index,
 				TableName: schema.TableName,
 				ColumnSchemas: columns,
 			}
 			//TODO: Create a node and a table, using table_schema
-			fmt.Println("table schema name: ", projtableschema.TableName)
-			fmt.Printf("rule = %v\n", rule)
+			fmt.Println("table schema: ", projtableschema)
 			*reply = ""
 			end.Call("Node.CallCreateTable", &projtableschema, reply)
 			fmt.Println("reply = ", *reply)
@@ -158,9 +157,9 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 			end.Call("Node.UpdateConstrain", []interface{}{projtableschema.TableName, rulecoef}, &reply)
 			fmt.Println("reply = ", *reply)
 			
-			//var ruleback *[]uint8
-			//end.Call("Node.ReadConstrain", projtableschema.TableName, &ruleback)
-			//fmt.Println("ruleback = ", string(*ruleback))
+			var ruleback []uint8
+			end.Call("Node.ReadConstrain", projtableschema.TableName, &ruleback)
+			fmt.Println("ruleback = ", string(ruleback))
 		}
 	}
 }
@@ -182,57 +181,86 @@ func numtrans(input interface{}) float64 {
 	return 0xFFFFFFFF
 }
 
-func numcompare(value float64, crivalue float64, op string) bool {
+func numcompare(value float64, crivalue float64, op string, flag *int) {
+	// fmt.Println("value = ", value)
+	// fmt.Println("crivalue = ", crivalue)
 	switch op {
 	case ">":
-		return value > crivalue
+		if !(value > crivalue) {
+			*flag ++
+		}
 	case ">=":
-		return value >= crivalue
+		if !(value >= crivalue) {
+			*flag ++
+		}
 	case "<=":
-		return value <= crivalue
+		if !(value <= crivalue) {
+			*flag ++
+		}
 	case "<":
-		return value < crivalue
+		if !(value < crivalue) {
+			*flag ++
+		}
 	case "!=":
-		return value != crivalue
+		if !(value != crivalue) {
+			*flag ++
+		}
 	default:
-		return true
+		*flag ++
 	}
+	// fmt.Println("flag = ", *flag)
 }
 
-func strcompare(value string, crivalue string, op string) bool {
+func strcompare(value string, crivalue string, op string, flag *int) {
+	// fmt.Println("value = ", value)
+	// fmt.Println("crivalue = ", crivalue)
 	switch op {
 	case "!=":
-		return value != crivalue
+		if value == crivalue {
+			*flag ++
+		}
 	case "==":
-		return value == crivalue
+		if value != crivalue {
+			*flag ++
+		}
 	default:
-		return true
+		*flag ++
 	}
+	// fmt.Println("flag = ", *flag)
 }
 
 func satisfy(mapdata map[string]interface{}, condition interface{}) bool {
+	//var sign int = 0
+	sign := 0
+	// field mean the attributions
 	if condition, ok := condition.(map[string]interface{}); ok{
 		for field, expressions := range condition {
 			for _, expression := range expressions.([]interface{}) {
 				value := mapdata[field]
-				exp := expression.(map[string]interface{})
-				fmt.Println(exp)
+				// exp := expression.(map[string]interface{})
+				// fmt.Println("exp = ", exp)
 				if expression, ok := expression.(map[string]interface{}); ok {
 					crivalue := expression["val"]
+					// fmt.Println("crivalue = ", crivalue)
 					op := expression["op"].(string)
-					crivalue_str, ok := crivalue.(string) 
+					crivalue_str, ok := crivalue.(string)
+					// fmt.Println("ok = ", ok)
+					// fmt.Printf("type of crivalue: %T\n", crivalue)
 					if ok {
-						if !strcompare(value.(string), crivalue_str, op) {
-							return false
+						if op == "!=" {
+							strcompare(value.(string), crivalue_str, op, &sign)
+						} else if op == "==" {
+							strcompare(value.(string), crivalue_str, op, &sign)
 						}
 					} else {
-						if !numcompare(numtrans(value), numtrans(crivalue), op) {
-							return false
-						}
+						numcompare(numtrans(value), numtrans(crivalue), op, &sign)
 					}
 				}
 			}
 		}
+	}
+	if sign > 0 {
+		return false
 	}
 	return true
 }
@@ -241,20 +269,27 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 	tableName := params[0].(string)
 	row := params[1].(Row)
 	fmt.Println("\n FragmentWriting...")
-	//fmt.Println("tableName: ", tableName)
+	fmt.Println("tableName: ", tableName)
 	fmt.Println("row: ", row)
 
 	fullSchema := c.TableSchemaMap[tableName].ColumnSchemas
-	//fmt.Println("Full table schema: ", fullSchema)
+	fmt.Println("Full table schema: ", fullSchema)
 
 	for _, nodeId := range c.nodeIds {
+		fmt.Println("nodeId = ", nodeId)
 		endName := "FW" + nodeId
 		end := c.network.MakeEnd(endName)
 		c.network.Connect(endName, nodeId)
 		c.network.Enable(endName, true)
 
 		rule := []uint8{}
-		end.Call("Node.ReadConstrain", tableName, &rule)
+		// fmt.Println("index = ", index)
+		// cname := tableName + strconv.Itoa(index)
+		cname := tableName
+		// fmt.Println("cname = ", cname)
+		// fmt.Printf("type of tableName: %T\n", tableName)
+		// fmt.Printf("type of index: %T\n", index)
+		end.Call("Node.ReadConstrain", cname, &rule)
 		jsonrule := make(map[string]interface{})
 		json.Unmarshal([]uint8(rule), &jsonrule)
 		fmt.Println("rule of node: ", jsonrule)
@@ -263,10 +298,12 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 		for index, schema := range fullSchema {
 			maprow[schema.Name] = row[index]
 		}
-		//fmt.Println("maprow: ", maprow)
 		reply := ""
 		
-		if satisfy(maprow, jsonrule["predicate"]) {
+		fmt.Println("maprow = ", maprow)
+		key := satisfy(maprow, jsonrule["predicate"])
+		fmt.Println("key = ", key)
+		if key {
 			//TODO: Insert into table
 			var rowToInsert Row
 			if rule_temp, ok := jsonrule["column"].([]interface{}); ok {
@@ -274,7 +311,20 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 					rowToInsert = append(rowToInsert, maprow[column.(string)])
 				}
 			}
-			end.Call("Node.CallInsert", []interface{}{tableName, rowToInsert}, &reply)
+			fmt.Println("rowToInsert: ", rowToInsert)
+			fmt.Println("tableName: ", cname)
+			end.Call("Node.CallInsert", []interface{}{cname, rowToInsert}, &reply)
+			fmt.Println("reply = ", reply)
+			fmt.Println("insert successfully")
+		} else {
+			fmt.Println("no need to insert")
 		}
 	}
+	// end0 := c.network.MakeEnd("client0")
+	// c.network.Connect("client0", "Node0")
+	// c.network.Enable("client0", true)
+
+	// table0 := Dataset{}
+	// end0.Call("Node.ScanTable", "sales0", &table0)
+	// fmt.Println("table0 = ", table0)
 }
