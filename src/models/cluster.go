@@ -131,7 +131,7 @@ func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 	// fmt.Println("commonattr = ", commonattr)
 
 	*reply = Dataset{}
-	end.Call("Node.InnerJoin", []*Dataset{&crschema, &stschema}, reply)
+	end.Call("Node.OuterJoin", []*Dataset{&crschema, &stschema}, reply)
 	fmt.Println("reply = ", *reply)
 }
 
