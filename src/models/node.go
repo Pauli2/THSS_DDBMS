@@ -180,8 +180,8 @@ func (n *Node) JoinAttr (schemas []*TableSchema, commonattr *[]ColumnSchema, res
 	lremain := []ColumnSchema{}
 	rremain := []ColumnSchema{}
 
-	fmt.Println("lsC = ", lschema.ColumnSchemas)
-	fmt.Println("rsC = ", rschema.ColumnSchemas)
+	// fmt.Println("lsC = ", lschema.ColumnSchemas)
+	// fmt.Println("rsC = ", rschema.ColumnSchemas)
 	for _, lattrinfo := range lschema.ColumnSchemas {
 		for _, cattrinfo := range *commonattr {
 			if lattrinfo != cattrinfo {
@@ -199,14 +199,10 @@ func (n *Node) JoinAttr (schemas []*TableSchema, commonattr *[]ColumnSchema, res
 			}
 		}
 	}
-	fmt.Println("lremain = ", lremain)
-	fmt.Println("rremain = ", rremain)
+	// fmt.Println("lremain = ", lremain)
+	// fmt.Println("rremain = ", rremain)
 	return []([]ColumnSchema){lremain, rremain}
 }
-
-// func (n *Node) CallJoin(tableNames []string, reply *Dataset) {
-
-// }
 
 func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
 	ltable, rtable := tables[0], tables[1]
@@ -222,6 +218,9 @@ func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
 	fmt.Println("remain = ", remain)
 	fmt.Println("joinattr = ", joinattr)
 
+	newdataset := Dataset{}
+	newdataset.Schema.TableName = ""
+	newdataset.Schema.ColumnSchemas = joinattr
 	for _, lrow := range ltable.Rows {
 		// add attributions of the content in lrow
 		maplrow := make(map[string]interface{})
@@ -232,14 +231,63 @@ func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
 		for _, rrow := range rtable.Rows {
 			maprrow := make(map[string]interface{})
 			for index, column := range rtable.Schema.ColumnSchemas {
+				fmt.Printf("type of rrow: %T\n", rrow[index])
 				maprrow[column.Name] = rrow[index]
 			}
 			fmt.Println("maprrow = ", maprrow)
 
+			// row to insert
+			newrow := make(Row, 0)
+			// check whether there is unconsistence
+			flag := 0
+			for _, column := range commonattr {
+				if maplrow[column.Name] != nil {
+					if maprrow[column.Name] != nil {
+						if !(maplrow[column.Name] == maprrow[column.Name]) {
+							flag ++
+						}
+					}
+				}
+			}
+			if flag == 0 {
+				for _, column := range commonattr {
+					if maplrow[column.Name] != nil {
+						newrow = append(newrow, maplrow[column.Name])
+					} else if maprrow[column.Name] != nil {
+						newrow = append(newrow, maprrow[column.Name])
+					} else {
+						newrow = append(newrow, nil)
+					}
+				}
+				for _, column := range remain[0] {
+					newrow = append(newrow, maplrow[column.Name])
+				}
+				for _, column := range remain[1] {
+					newrow = append(newrow, maprrow[column.Name])
+				}
+			}
 		}
 	}
+	*reply = newdataset
 }
 
-// func (n *Node) OuterJoin(ltable *Dataset, rtable *Dataset) *Dataset {
+func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
+	ltable, rtable := tables[0], tables[1]
+	fmt.Println("ltable = ", *ltable)
+	fmt.Println("rtable = ", *rtable)
 
-// }
+	commonattr := []ColumnSchema{}
+	n.CommonAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr)
+	fmt.Println("commonattr = ", commonattr)
+
+	joinattr := []ColumnSchema{}
+	remain := n.JoinAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr, &joinattr)
+	fmt.Println("remain = ", remain)
+	fmt.Println("joinattr = ", joinattr)
+
+	newdataset := Dataset{}
+	newdataset.Schema.TableName = ""
+	newdataset.Schema.ColumnSchemas = joinattr
+
+
+}
