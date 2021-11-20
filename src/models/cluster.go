@@ -25,6 +25,7 @@ type Cluster struct {
 	// the Name of the cluster, also used as a network address of the cluster coordinator in the network above
 	Name string
 	TableSchemaMap map[string]TableSchema
+	TableMap map[string][]string
 }
 
 // NewCluster creates a Cluster with the given number of nodes and register the nodes to the given network.
@@ -63,7 +64,7 @@ func NewCluster(nodeNum int, network *labrpc.Network, clusterName string) *Clust
 	}
 
 	// create a cluster with the nodes and the network
-	c := &Cluster{nodeIds: nodeIds, network: network, Name: clusterName, TableSchemaMap: make(map[string]TableSchema)}
+	c := &Cluster{nodeIds: nodeIds, network: network, Name: clusterName, TableSchemaMap: make(map[string]TableSchema), TableMap: make(map[string][]string)}
 	// create a coordinator for the cluster to receive external requests, the steps are similar to those above.
 	// notice that we use the reference of the cluster as the name of the coordinator server,
 	// and the names can be more than strings.
@@ -110,6 +111,7 @@ func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 
 func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 	// read the coefficients
+	fmt.Println("\n  Building table...")
 	schema := params[0].(TableSchema)
 	rules := params[1].([]uint8)
 	fmt.Println("Table name: ", schema.TableName)
@@ -117,13 +119,16 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 
 	// add a new table into the cluster
 	c.TableSchemaMap[schema.TableName] = schema
+	c.TableMap[schema.TableName] = make([]string, 0)
 	// get the rules for later insertion
 	var jsonrules map[string](map[string]interface{})
 	json.Unmarshal([]uint8(rules), &jsonrules)
+	fmt.Println("Table rules: ", jsonrules)
 
 	// build table in every node
 	for index, rule := range jsonrules {
 		intinddex, _ := strconv.Atoi(index)
+		c.TableMap[schema.TableName] = append(c.TableMap[schema.TableName], index)
 		fmt.Println(c.nodeIds[intinddex])
 
 		// connect a node through the network
@@ -269,7 +274,8 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 	fmt.Println("Full table schema: ", fullSchema)
 
 	// a row might be inserted into a few nodes
-	for _, nodeId := range c.nodeIds {
+	for _, Id := range c.TableMap[tableName] {
+		nodeId := "Node" + Id
 		fmt.Println("nodeId = ", nodeId)
 		endName := "FW" + nodeId
 		end := c.network.MakeEnd(endName)
