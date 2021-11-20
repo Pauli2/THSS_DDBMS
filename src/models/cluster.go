@@ -110,28 +110,51 @@ func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 	fmt.Println("\n  Start Joining...")
 	fmt.Println("tableNames = ", tableNames)
 
+	ldata := Dataset{}
+	for _, Id := range c.TableMap[tableNames[0]] {
+		nodeId := "Node" + Id
+		fmt.Println("nodeId = ", nodeId)
+		endName := "J" + nodeId
+		end := c.network.MakeEnd(endName)
+		c.network.Connect(endName, nodeId)
+		c.network.Enable(endName, true)
+
+		newdata := Dataset{}
+		end.Call("Node.ScanTable", tableNames[0], &newdata)
+
+		*reply = Dataset{}
+		end.Call("Node.OuterJoin", []*Dataset{&ldata, &newdata}, reply)
+		fmt.Println("reply = ", *reply)
+		ldata = *reply
+	}
+
+	rdata := Dataset{}
+	for _, Id := range c.TableMap[tableNames[1]] {
+		nodeId := "Node" + Id
+		fmt.Println("nodeId = ", nodeId)
+		endName := "J" + nodeId
+		end := c.network.MakeEnd(endName)
+		c.network.Connect(endName, nodeId)
+		c.network.Enable(endName, true)
+
+		newdata := Dataset{}
+		end.Call("Node.ScanTable", tableNames[1], &newdata)
+
+		*reply = Dataset{}
+		end.Call("Node.OuterJoin", []*Dataset{&rdata, &newdata}, reply)
+		fmt.Println("reply = ", *reply)
+		rdata = *reply
+	}
 
 	// connect a node through the network
-	endName := "JoinNode1"
+	endName := "JoinNode0"
 	fmt.Println(endName)
 	end := c.network.MakeEnd(endName)
-	c.network.Connect(endName, "Node1")
+	c.network.Connect(endName, "Node0")
 	c.network.Enable(endName, true)
 
-	crschema := Dataset{}
-	stschema := Dataset{}
-	end.Call("Node.ScanTable", "courseRegistration", &crschema)
-	end.Call("Node.ScanTable", "student", &stschema)
-
-	fmt.Println("cr = ", crschema)
-	fmt.Println("st = ", stschema)
-
-	// commonattr := []ColumnSchema{}
-	// end.Call("Node.CommonAttr", []*TableSchema{&crschema.Schema, &stschema.Schema}, &commonattr)
-	// fmt.Println("commonattr = ", commonattr)
-
 	*reply = Dataset{}
-	end.Call("Node.OuterJoin", []*Dataset{&crschema, &stschema}, reply)
+	end.Call("Node.InnerJoin", []*Dataset{&ldata, &rdata}, reply)
 	fmt.Println("reply = ", *reply)
 }
 
