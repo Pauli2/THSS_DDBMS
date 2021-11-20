@@ -107,7 +107,32 @@ func (c *Cluster) SayHello(visitor string, reply *string) {
 // as a list of rows and set it to reply.
 func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 	//TODO lab2
+	fmt.Println("\n  Start Joining...")
 	fmt.Println("tableNames = ", tableNames)
+
+
+	// connect a node through the network
+	endName := "JoinNode1"
+	fmt.Println(endName)
+	end := c.network.MakeEnd(endName)
+	c.network.Connect(endName, "Node1")
+	c.network.Enable(endName, true)
+
+	crschema := Dataset{}
+	stschema := Dataset{}
+	end.Call("Node.ScanTable", "courseRegistration", &crschema)
+	end.Call("Node.ScanTable", "student", &stschema)
+
+	fmt.Println("cr = ", crschema)
+	fmt.Println("st = ", stschema)
+
+	// commonattr := []ColumnSchema{}
+	// end.Call("Node.CommonAttr", []*TableSchema{&crschema.Schema, &stschema.Schema}, &commonattr)
+	// fmt.Println("commonattr = ", commonattr)
+
+	*reply = Dataset{}
+	end.Call("Node.InnerJoin", []*Dataset{&crschema, &stschema}, reply)
+	fmt.Println("reply = ", *reply)
 }
 
 func (c *Cluster) BuildTable(params []interface{}, reply *string) {

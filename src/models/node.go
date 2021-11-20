@@ -155,3 +155,91 @@ func (n *Node) ScanTable(tableName string, dataset *Dataset) {
 		*dataset = resultSet
 	}
 }
+
+func (n *Node) CommonAttr (schemas []*TableSchema, results *[]ColumnSchema) {
+	*results = []ColumnSchema{}
+	lschema, rschema := schemas[0], schemas[1]
+	for _, lattrinfo := range lschema.ColumnSchemas {
+		for _, rattrinfo := range rschema.ColumnSchemas {
+			if lattrinfo == rattrinfo {
+				*results = append(*results, lattrinfo)
+			}
+		}
+	}
+}
+
+func (n *Node) JoinAttr (schemas []*TableSchema, commonattr *[]ColumnSchema, results *[]ColumnSchema) []([]ColumnSchema) {
+	lschema := schemas[0]
+	rschema := schemas[1]
+
+	*results = []ColumnSchema{}
+	for _, cattrinfo := range *commonattr {
+		*results = append(*results, cattrinfo)
+	}
+
+	lremain := []ColumnSchema{}
+	rremain := []ColumnSchema{}
+
+	fmt.Println("lsC = ", lschema.ColumnSchemas)
+	fmt.Println("rsC = ", rschema.ColumnSchemas)
+	for _, lattrinfo := range lschema.ColumnSchemas {
+		for _, cattrinfo := range *commonattr {
+			if lattrinfo != cattrinfo {
+				*results = append(*results, lattrinfo)
+				lremain = append(lremain, lattrinfo)
+			}
+		}
+	}
+
+	for _, rattrinfo := range rschema.ColumnSchemas {
+		for _, cattrinfo := range *commonattr {
+			if rattrinfo != cattrinfo {
+				*results = append(*results, rattrinfo)
+				rremain = append(rremain, rattrinfo)
+			}
+		}
+	}
+	fmt.Println("lremain = ", lremain)
+	fmt.Println("rremain = ", rremain)
+	return []([]ColumnSchema){lremain, rremain}
+}
+
+// func (n *Node) CallJoin(tableNames []string, reply *Dataset) {
+
+// }
+
+func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
+	ltable, rtable := tables[0], tables[1]
+	fmt.Println("ltable = ", *ltable)
+	fmt.Println("rtable = ", *rtable)
+
+	commonattr := []ColumnSchema{}
+	n.CommonAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr)
+	fmt.Println("commonattr = ", commonattr)
+
+	joinattr := []ColumnSchema{}
+	remain := n.JoinAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr, &joinattr)
+	fmt.Println("remain = ", remain)
+	fmt.Println("joinattr = ", joinattr)
+
+	for _, lrow := range ltable.Rows {
+		// add attributions of the content in lrow
+		maplrow := make(map[string]interface{})
+		for index, column := range ltable.Schema.ColumnSchemas {
+			maplrow[column.Name] = lrow[index]
+		}
+		fmt.Println("maplrow = ", maplrow)
+		for _, rrow := range rtable.Rows {
+			maprrow := make(map[string]interface{})
+			for index, column := range rtable.Schema.ColumnSchemas {
+				maprrow[column.Name] = rrow[index]
+			}
+			fmt.Println("maprrow = ", maprrow)
+
+		}
+	}
+}
+
+// func (n *Node) OuterJoin(ltable *Dataset, rtable *Dataset) *Dataset {
+
+// }
