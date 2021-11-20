@@ -16,7 +16,7 @@ type Node struct {
 
 // NewNode creates a new node with the given name and an empty set of tables
 func NewNode(id string) *Node {
-	return &Node{TableMap: make(map[string]*Table), Identifier: id}
+	return &Node{TableMap: make(map[string]*Table), Identifier: id, Constrain: make(map[string][]uint8)}
 }
 
 // SayHello is an example about how to create a method that can be accessed by RPC (remote procedure call, methods that
@@ -40,7 +40,7 @@ func (n *Node) CreateTable(schema *TableSchema) error {
 		NewMemoryListRowStore(),
 	)
 	n.TableMap[schema.TableName] = t
-	n.Constrain = make(map[string][]uint8)
+	n.Constrain[schema.TableName] = make([]uint8, 0)
 	return nil
 }
 

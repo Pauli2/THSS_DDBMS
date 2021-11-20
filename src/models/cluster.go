@@ -107,6 +107,7 @@ func (c *Cluster) SayHello(visitor string, reply *string) {
 // as a list of rows and set it to reply.
 func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 	//TODO lab2
+	fmt.Println("tableNames = ", tableNames)
 }
 
 func (c *Cluster) BuildTable(params []interface{}, reply *string) {
