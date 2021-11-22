@@ -103,48 +103,33 @@ func (c *Cluster) SayHello(visitor string, reply *string) {
 	*reply = fmt.Sprintf("Hello %s, I am the coordinator of %s", visitor, c.Name)
 }
 
+func (c *Cluster) MergeFullTable(tableName string) Dataset {
+	data := Dataset{}
+	for _, Id := range c.TableMap[tableName] {
+		nodeId := "Node" + Id
+		fmt.Println("nodeId = ", nodeId)
+		endName := "J" + nodeId
+		end := c.network.MakeEnd(endName)
+		c.network.Connect(endName, nodeId)
+		c.network.Enable(endName, true)
+
+		newdata := Dataset{}
+		end.Call("Node.ScanTable", tableName, &newdata)
+
+		tmpdata := Dataset{}
+		end.Call("Node.OuterJoin", []*Dataset{&data, &newdata}, &tmpdata)
+		fmt.Println("reply = ", tmpdata)
+		data = tmpdata
+	}
+	return data
+}
+
 // Join all tables in the given list using NATURAL JOIN (join on the common columns), and return the joined result
 // as a list of rows and set it to reply.
 func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 	//TODO lab2
 	fmt.Println("\n  Start Joining...")
 	fmt.Println("tableNames = ", tableNames)
-
-	ldata := Dataset{}
-	for _, Id := range c.TableMap[tableNames[0]] {
-		nodeId := "Node" + Id
-		fmt.Println("nodeId = ", nodeId)
-		endName := "J" + nodeId
-		end := c.network.MakeEnd(endName)
-		c.network.Connect(endName, nodeId)
-		c.network.Enable(endName, true)
-
-		newdata := Dataset{}
-		end.Call("Node.ScanTable", tableNames[0], &newdata)
-
-		*reply = Dataset{}
-		end.Call("Node.OuterJoin", []*Dataset{&ldata, &newdata}, reply)
-		fmt.Println("reply = ", *reply)
-		ldata = *reply
-	}
-
-	rdata := Dataset{}
-	for _, Id := range c.TableMap[tableNames[1]] {
-		nodeId := "Node" + Id
-		fmt.Println("nodeId = ", nodeId)
-		endName := "J" + nodeId
-		end := c.network.MakeEnd(endName)
-		c.network.Connect(endName, nodeId)
-		c.network.Enable(endName, true)
-
-		newdata := Dataset{}
-		end.Call("Node.ScanTable", tableNames[1], &newdata)
-
-		*reply = Dataset{}
-		end.Call("Node.OuterJoin", []*Dataset{&rdata, &newdata}, reply)
-		fmt.Println("reply = ", *reply)
-		rdata = *reply
-	}
 
 	// connect a node through the network
 	endName := "JoinNode0"
@@ -153,8 +138,19 @@ func (c *Cluster) Join(tableNames []string, reply *Dataset) {
 	c.network.Connect(endName, "Node0")
 	c.network.Enable(endName, true)
 
-	*reply = Dataset{}
-	end.Call("Node.InnerJoin", []*Dataset{&ldata, &rdata}, reply)
+	datasets := []Dataset{}
+	for _, tableName := range(tableNames) {
+		datasets = append(datasets, c.MergeFullTable(tableName))
+	}
+
+	outdata := datasets[0]
+	for _, dataset := range(datasets[1:]) {
+		tmpdata := Dataset{}
+		end.Call("Node.InnerJoin", []*Dataset{&outdata, &dataset}, &tmpdata)
+		outdata = tmpdata
+	}
+	
+	*reply = outdata
 	fmt.Println("reply = ", *reply)
 }
 

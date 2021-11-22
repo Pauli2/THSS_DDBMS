@@ -173,9 +173,7 @@ func (n *Node) JoinAttr (schemas []*TableSchema, commonattr *[]ColumnSchema, res
 	rschema := schemas[1]
 
 	*results = []ColumnSchema{}
-	for _, cattrinfo := range *commonattr {
-		*results = append(*results, cattrinfo)
-	}
+	*results = append(*results, *commonattr...)
 
 	lremain := []ColumnSchema{}
 	rremain := []ColumnSchema{}
@@ -251,7 +249,7 @@ func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
 			for _, column := range commonattr {
 				if maplrow[column.Name] != "" {
 					if maprrow[column.Name] != "" {
-						if !(maplrow[column.Name] == maprrow[column.Name]) {
+						if maplrow[column.Name] != maprrow[column.Name] {
 							flag ++
 						}
 					}
@@ -324,7 +322,7 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 				for _, column := range commonattr {
 					if maplrow[column.Name] != "" {
 						if maprrow[column.Name] != "" {
-							if !(maplrow[column.Name] == maprrow[column.Name]) {
+							if maplrow[column.Name] != maprrow[column.Name] {
 								flag ++
 							}
 						}
@@ -391,7 +389,7 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 				for _, column := range commonattr {
 					if maprrow[column.Name] != "" {
 						if maplrow[column.Name] != "" {
-							if !(maprrow[column.Name] == maplrow[column.Name]) {
+							if maprrow[column.Name] != maplrow[column.Name] {
 								flag ++
 							}
 						}
