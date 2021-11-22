@@ -16,7 +16,7 @@ type Node struct {
 
 // NewNode creates a new node with the given name and an empty set of tables
 func NewNode(id string) *Node {
-	return &Node{TableMap: make(map[string]*Table), Identifier: id}
+	return &Node{TableMap: make(map[string]*Table), Identifier: id, Constrain: make(map[string][]uint8)}
 }
 
 // SayHello is an example about how to create a method that can be accessed by RPC (remote procedure call, methods that
@@ -40,11 +40,12 @@ func (n *Node) CreateTable(schema *TableSchema) error {
 		NewMemoryListRowStore(),
 	)
 	n.TableMap[schema.TableName] = t
-	n.Constrain = make(map[string][]uint8)
+	n.Constrain[schema.TableName] = make([]uint8, 0)
 	return nil
 }
 
 func (n *Node) CallCreateTable(schema *TableSchema, reply *string) {
+	// start the CreateTable function
 	err := n.CreateTable(schema)
 	if err == nil {
 		*reply = "create table " + schema.TableName + " sucessfully"
@@ -54,11 +55,9 @@ func (n *Node) CallCreateTable(schema *TableSchema, reply *string) {
 }
 
 func (n *Node) ReadConstrain(tableName string, ruleback *[]uint8) {
+	// read the rule in this node
 	if _, ok := n.Constrain[tableName]; ok {
 		fmt.Println("read constrain of " + tableName + " successfully")
-		// fmt.Printf("n.Constrain[tableName] : %v\n", string(n.Constrain[tableName]))
-		// fmt.Printf("type of ruleback: %T\n", ruleback)
-		// fmt.Printf("type of constrain: %T\n", n.Constrain[tableName])
 		*ruleback = n.Constrain[tableName]
 	} else {
 		fmt.Println("table " + tableName + " does not exsit")
@@ -66,15 +65,13 @@ func (n *Node) ReadConstrain(tableName string, ruleback *[]uint8) {
 }
 
 func (n *Node) UpdateConstrain(tableinfo []interface{}, reply *string) {
-	// fmt.Println(tableinfo)
+	// update the rule in this node
 	tableName := tableinfo[0].(string)
 	tablerules := tableinfo[1].([]uint8)
 	fmt.Println("tablerules = ", string(tablerules))
 	if _, ok := n.TableMap[tableName]; ok {
 		n.Constrain[tableName] = tablerules
 		*reply = "update constrain of table " + tableName + " successfully"
-		// fmt.Printf("n.Constrain[tableName] : %v\n", string(n.Constrain[tableName]))
-		// fmt.Printf("tablerules : %v\n", string(tablerules))
 	} else {
 		*reply = "table " + tableName + " does not exsit"
 	}
@@ -84,6 +81,7 @@ func (n *Node) CallInsert(params []interface{}, reply *string) {
 	tableName := params[0].(string)
 	row := params[1].(Row)
 
+	// start the Insert function
 	err := n.Insert(tableName, &row)
 	if err == nil {
 		*reply = "Insert into table sucessfully"
@@ -155,5 +153,271 @@ func (n *Node) ScanTable(tableName string, dataset *Dataset) {
 		resultSet.Rows = tableRows
 		resultSet.Schema = *t.schema
 		*dataset = resultSet
+	}
+}
+
+func (n *Node) CommonAttr (schemas []*TableSchema, results *[]ColumnSchema) {
+	*results = []ColumnSchema{}
+	lschema, rschema := schemas[0], schemas[1]
+	for _, lattrinfo := range lschema.ColumnSchemas {
+		for _, rattrinfo := range rschema.ColumnSchemas {
+			if lattrinfo == rattrinfo {
+				*results = append(*results, lattrinfo)
+			}
+		}
+	}
+}
+
+func (n *Node) JoinAttr (schemas []*TableSchema, commonattr *[]ColumnSchema, results *[]ColumnSchema) []([]ColumnSchema) {
+	lschema := schemas[0]
+	rschema := schemas[1]
+
+	*results = []ColumnSchema{}
+	for _, cattrinfo := range *commonattr {
+		*results = append(*results, cattrinfo)
+	}
+
+	lremain := []ColumnSchema{}
+	rremain := []ColumnSchema{}
+
+	fmt.Println("lsC = ", lschema.ColumnSchemas)
+	fmt.Println("rsC = ", rschema.ColumnSchemas)
+	for _, lattrinfo := range lschema.ColumnSchemas {
+		flag := 0
+		for _, cattrinfo := range *commonattr {
+			if lattrinfo == cattrinfo {
+				flag ++
+			}
+		}
+		if flag == 0 {
+			*results = append(*results, lattrinfo)
+			lremain = append(lremain, lattrinfo)
+		}
+	}
+
+	for _, rattrinfo := range rschema.ColumnSchemas {
+		flag := 0
+		for _, cattrinfo := range *commonattr {
+			if rattrinfo == cattrinfo {
+				flag ++
+			}
+		}
+		if flag == 0 {
+			*results = append(*results, rattrinfo)
+			rremain = append(rremain, rattrinfo)
+		}
+	}
+	fmt.Println("lremain = ", lremain)
+	fmt.Println("rremain = ", rremain)
+	return []([]ColumnSchema){lremain, rremain}
+}
+
+func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
+	ltable, rtable := tables[0], tables[1]
+	fmt.Println("ltable = ", *ltable)
+	fmt.Println("rtable = ", *rtable)
+
+	commonattr := []ColumnSchema{}
+	n.CommonAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr)
+	fmt.Println("commonattr = ", commonattr)
+
+	joinattr := []ColumnSchema{}
+	remain := n.JoinAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr, &joinattr)
+	fmt.Println("remain = ", remain)
+	fmt.Println("joinattr = ", joinattr)
+
+	newdataset := Dataset{}
+	newdataset.Schema.TableName = ""
+	newdataset.Schema.ColumnSchemas = joinattr
+	for _, lrow := range ltable.Rows {
+		// add attributions of the content in lrow
+		maplrow := make(map[string]interface{})
+		for index, column := range ltable.Schema.ColumnSchemas {
+			maplrow[column.Name] = lrow[index]
+		}
+		fmt.Println("maplrow = ", maplrow)
+		for _, rrow := range rtable.Rows {
+			maprrow := make(map[string]interface{})
+			for index, column := range rtable.Schema.ColumnSchemas {
+				// fmt.Printf("type of rrow: %T\n", rrow[index])
+				maprrow[column.Name] = rrow[index]
+			}
+			fmt.Println("maprrow = ", maprrow)
+
+			// row to insert
+			newrow := make(Row, 0)
+			// check whether there is unconsistence
+			flag := 0
+			for _, column := range commonattr {
+				if maplrow[column.Name] != "" {
+					if maprrow[column.Name] != "" {
+						if !(maplrow[column.Name] == maprrow[column.Name]) {
+							flag ++
+						}
+					}
+				}
+			}
+			if flag == 0 {
+				for _, column := range commonattr {
+					if maplrow[column.Name] != "" {
+						newrow = append(newrow, maplrow[column.Name])
+					} else if maprrow[column.Name] != "" {
+						newrow = append(newrow, maprrow[column.Name])
+					} else {
+						newrow = append(newrow, "")
+					}
+				}
+				for _, column := range remain[0] {
+					newrow = append(newrow, maplrow[column.Name])
+				}
+				for _, column := range remain[1] {
+					newrow = append(newrow, maprrow[column.Name])
+				}
+				newdataset.Rows = append(newdataset.Rows, newrow)
+			}
+		}
+	}
+	*reply = newdataset
+}
+
+func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
+	ltable, rtable := tables[0], tables[1]
+	fmt.Println("ltable = ", *ltable)
+	fmt.Println("rtable = ", *rtable)
+
+	if len(ltable.Rows) == 0 {
+		*reply = *rtable
+	} else if len(rtable.Rows) == 0 {
+		*reply = *ltable
+	} else {
+		commonattr := []ColumnSchema{}
+		n.CommonAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr)
+		fmt.Println("commonattr = ", commonattr)
+	
+		joinattr := []ColumnSchema{}
+		remain := n.JoinAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr, &joinattr)
+		fmt.Println("remain = ", remain)
+		fmt.Println("joinattr = ", joinattr)
+
+		newdataset := Dataset{}
+		newdataset.Schema.TableName = ""
+		newdataset.Schema.ColumnSchemas = joinattr
+
+		for _, lrow := range ltable.Rows {
+			// add attributions of the content in lrow
+			maplrow := make(map[string]interface{})
+			for index, column := range ltable.Schema.ColumnSchemas {
+				maplrow[column.Name] = lrow[index]
+			}
+			fmt.Println("maplrow = ", maplrow)
+
+			consistence := 0
+			for _, rrow := range rtable.Rows {
+				maprrow := make(map[string]interface{})
+				for index, column := range rtable.Schema.ColumnSchemas {
+					maprrow[column.Name] = rrow[index]
+				}
+				fmt.Println("maprrow = ", maprrow)
+
+				// check whether there is unconsistence
+				flag := 0
+				for _, column := range commonattr {
+					if maplrow[column.Name] != "" {
+						if maprrow[column.Name] != "" {
+							if !(maplrow[column.Name] == maprrow[column.Name]) {
+								flag ++
+							}
+						}
+					}
+				}
+				if flag == 0 {
+					consistence ++
+					// row to insert
+					newrow := make(Row, 0)
+					for _, column := range commonattr {
+						if maplrow[column.Name] != "" {
+							newrow = append(newrow, maplrow[column.Name])
+						} else if maprrow[column.Name] != "" {
+							newrow = append(newrow, maprrow[column.Name])
+						} else {
+							newrow = append(newrow, "")
+						}
+					}
+					for _, column := range remain[0] {
+						newrow = append(newrow, maplrow[column.Name])
+					}
+					for _, column := range remain[1] {
+						newrow = append(newrow, maprrow[column.Name])
+					}
+					newdataset.Rows = append(newdataset.Rows, newrow)
+				}
+			}
+			if consistence == 0 {
+				// row to insert
+				lnewrow := make(Row, 0)
+				for _, column := range commonattr {
+					fmt.Println("ccolumn = ", column)
+					lnewrow = append(lnewrow, maplrow[column.Name])
+				}
+				for _, column := range remain[0] {
+					lnewrow = append(lnewrow, maplrow[column.Name])
+				}
+				for _, column := range remain[1] {
+					fmt.Println("column = ", column)
+					lnewrow = append(lnewrow, "")
+				}
+				newdataset.Rows = append(newdataset.Rows, lnewrow)
+			}
+		}
+
+		for _, rrow := range rtable.Rows {
+			// add attributions of the content in lrow
+			maprrow := make(map[string]interface{})
+			for index, column := range rtable.Schema.ColumnSchemas {
+				maprrow[column.Name] = rrow[index]
+			}
+			fmt.Println("maprrow = ", maprrow)
+
+			consistence := 0
+			for _, lrow := range ltable.Rows {
+				maplrow := make(map[string]interface{})
+				for index, column := range ltable.Schema.ColumnSchemas {
+					maplrow[column.Name] = lrow[index]
+				}
+				fmt.Println("maplrow = ", maplrow)
+
+				// check whether there is unconsistence
+				flag := 0
+				for _, column := range commonattr {
+					if maprrow[column.Name] != "" {
+						if maplrow[column.Name] != "" {
+							if !(maprrow[column.Name] == maplrow[column.Name]) {
+								flag ++
+							}
+						}
+					}
+				}
+				if flag == 0 {
+					consistence ++
+				}
+			}
+			if consistence == 0 {
+				// row to insert
+				rnewrow := make(Row, 0)
+				for _, column := range commonattr {
+					fmt.Println("ccolumn = ", column)
+					rnewrow = append(rnewrow, maprrow[column.Name])
+				}
+				for _, column := range remain[0] {
+					fmt.Println("column = ", column)
+					rnewrow = append(rnewrow, "")
+				}
+				for _, column := range remain[1] {
+					rnewrow = append(rnewrow, maprrow[column.Name])
+				}
+				newdataset.Rows = append(newdataset.Rows, rnewrow)
+			}
+		}
+		*reply = newdataset
 	}
 }
