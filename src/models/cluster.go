@@ -210,7 +210,7 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 
 			var ruleback []uint8
 			end.Call("Node.ReadConstrain", projtableschema.TableName, &ruleback)
-			fmt.Println("ruleback = ", string(ruleback))
+			//fmt.Println("ruleback = ", string(ruleback))
 		}
 	}
 }
@@ -342,7 +342,7 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 		fmt.Println("maprow = ", maprow)
 
 		// check out whether this row should be inserted into this node
-		key := satisfy(maprow, jsonrule["predicate"].(map[string]interface{}))
+		key := satisfy(maprow, jsonrule["predicate"])
 		fmt.Println("key = ", key)
 		if key {
 			reply := ""
