@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"../labgob"
 	"../labrpc"
@@ -172,45 +173,52 @@ func (c *Cluster) BuildTable(params []interface{}, reply *string) {
 
 	// build table in every node
 	for index, rule := range jsonrules {
-		intinddex, _ := strconv.Atoi(index)
-		c.TableMap[schema.TableName] = append(c.TableMap[schema.TableName], index)
-		fmt.Println(c.nodeIds[intinddex])
+		fmt.Println("index:", index)
 
-		// connect a node through the network
-		endName := schema.TableName + c.nodeIds[intinddex]
-		fmt.Println(endName)
-		end := c.network.MakeEnd(endName)
-		c.network.Connect(endName, c.nodeIds[intinddex])
-		c.network.Enable(endName, true)
-
-		// get the datatype of columns in this node
-		var columns []ColumnSchema
-		if rule_columns, ok := rule["column"].([]interface{}); ok {
-			for _, column_name := range rule_columns {
-				for _, column := range schema.ColumnSchemas {
-					if column.Name == column_name {
-						columns = append(columns, column)
+		// check if replication exists
+		indexes := strings.Split(index, "|")
+		for _, index := range indexes {
+			intindex, _ := strconv.Atoi(index)
+			fmt.Println("intindex:", intindex)
+			c.TableMap[schema.TableName] = append(c.TableMap[schema.TableName], index)
+			fmt.Println(c.nodeIds[intindex])
+	
+			// connect a node through the network
+			endName := schema.TableName + c.nodeIds[intindex]
+			fmt.Println(endName)
+			end := c.network.MakeEnd(endName)
+			c.network.Connect(endName, c.nodeIds[intindex])
+			c.network.Enable(endName, true)
+	
+			// get the datatype of columns in this node
+			var columns []ColumnSchema
+			if rule_columns, ok := rule["column"].([]interface{}); ok {
+				for _, column_name := range rule_columns {
+					for _, column := range schema.ColumnSchemas {
+						if column.Name == column_name {
+							columns = append(columns, column)
+						}
 					}
 				}
+				projtableschema := TableSchema{
+					TableName: schema.TableName,
+					ColumnSchemas: columns,
+				}
+				//TODO: Create a node and a table, using table_schema
+				fmt.Println("table schema: ", projtableschema)
+				*reply = ""
+				end.Call("Node.CallCreateTable", &projtableschema, reply)
+				fmt.Println("reply = ", *reply)
+	
+				rulecoef, _ := json.Marshal(rule)
+				*reply = ""
+				end.Call("Node.UpdateConstrain", []interface{}{projtableschema.TableName, rulecoef}, reply)
+				fmt.Println("reply = ", *reply)
+	
+				var ruleback []uint8
+				end.Call("Node.ReadConstrain", projtableschema.TableName, &ruleback)
+				//fmt.Println("ruleback = ", string(ruleback))
 			}
-			projtableschema := TableSchema{
-				TableName: schema.TableName,
-				ColumnSchemas: columns,
-			}
-			//TODO: Create a node and a table, using table_schema
-			fmt.Println("table schema: ", projtableschema)
-			*reply = ""
-			end.Call("Node.CallCreateTable", &projtableschema, reply)
-			fmt.Println("reply = ", *reply)
-
-			rulecoef, _ := json.Marshal(rule)
-			*reply = ""
-			end.Call("Node.UpdateConstrain", []interface{}{projtableschema.TableName, rulecoef}, reply)
-			fmt.Println("reply = ", *reply)
-
-			var ruleback []uint8
-			end.Call("Node.ReadConstrain", projtableschema.TableName, &ruleback)
-			//fmt.Println("ruleback = ", string(ruleback))
 		}
 	}
 }
