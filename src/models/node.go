@@ -32,6 +32,21 @@ func (n *Node) SayHello(args interface{}, reply *string) {
 func (n *Node) CreateTable(schema *TableSchema) error {
 	// check if the table already exists
 	if _, ok := n.TableMap[schema.TableName]; ok {
+		// check if column needs to be added
+		if n.TableMap[schema.TableName].schema != schema {
+			for _, column := range(schema.ColumnSchemas) {
+				flag := true
+				for _, columnOld := range(n.TableMap[schema.TableName].schema.ColumnSchemas) {
+					if column == columnOld {
+						flag = false
+					}
+				}
+				if flag {
+					n.TableMap[schema.TableName].schema.ColumnSchemas = append(n.TableMap[schema.TableName].schema.ColumnSchemas, column)
+				}
+			}
+		}
+		fmt.Println(n.TableMap[schema.TableName].schema.ColumnSchemas)
 		return errors.New("table already exists")
 	}
 	// create a table and store it in the map
