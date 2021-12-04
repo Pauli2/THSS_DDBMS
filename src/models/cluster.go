@@ -320,11 +320,11 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 	row := params[1].(Row)
 	fmt.Println("\n FragmentWriting...")
 	fmt.Println("tableName: ", tableName)
-	fmt.Println("row: ", row)
+	//fmt.Println("row: ", row)
 
 	// get the full schema of this table in the cluster
 	fullSchema := c.TableSchemaMap[tableName].ColumnSchemas
-	fmt.Println("Full table schema: ", fullSchema)
+	//fmt.Println("Full table schema: ", fullSchema)
 
 	// a row might be inserted into a few nodes
 	for _, Id := range c.TableMap[tableName] {
@@ -351,7 +351,7 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 
 		// check out whether this row should be inserted into this node
 		key := satisfy(maprow, jsonrule["predicate"])
-		fmt.Println("key = ", key)
+		//fmt.Println("key = ", key)
 		if key {
 			reply := ""
 			var rowToInsert Row
@@ -363,7 +363,7 @@ func (c *Cluster) FragmentWrite(params []interface{}, reply *string) {
 			fmt.Println("rowToInsert: ", rowToInsert)
 			fmt.Println("tableName: ", tableName)
 			end.Call("Node.CallInsert", []interface{}{tableName, rowToInsert}, &reply)
-			fmt.Println("reply = ", reply)
+			//fmt.Println("reply = ", reply)
 			fmt.Println("insert successfully")
 		} else {
 			fmt.Println("there is no need to insert")

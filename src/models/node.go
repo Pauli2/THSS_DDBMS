@@ -72,7 +72,7 @@ func (n *Node) CallCreateTable(schema *TableSchema, reply *string) {
 func (n *Node) ReadConstrain(tableName string, ruleback *[]uint8) {
 	// read the rule in this node
 	if _, ok := n.Constrain[tableName]; ok {
-		fmt.Println("read constrain of " + tableName + " successfully")
+		//fmt.Println("read constrain of " + tableName + " successfully")
 		*ruleback = n.Constrain[tableName]
 	} else {
 		fmt.Println("table " + tableName + " does not exsit")
@@ -242,6 +242,7 @@ func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
 	newdataset := Dataset{}
 	newdataset.Schema.TableName = ""
 	newdataset.Schema.ColumnSchemas = joinattr
+
 	for _, lrow := range ltable.Rows {
 		// add attributions of the content in lrow
 		maplrow := make(map[string]interface{})
@@ -262,12 +263,9 @@ func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
 			// check whether there is unconsistence
 			flag := 0
 			for _, column := range commonattr {
-				if maplrow[column.Name] != "" {
-					if maprrow[column.Name] != "" {
-						if maplrow[column.Name] != maprrow[column.Name] {
-							flag ++
-						}
-					}
+				if maplrow[column.Name] != "" && maprrow[column.Name] != "" && maplrow[column.Name] != maprrow[column.Name] {
+					flag = 1
+					break
 				}
 			}
 			if flag == 0 {
@@ -286,7 +284,7 @@ func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
 				for _, column := range remain[1] {
 					newrow = append(newrow, maprrow[column.Name])
 				}
-				newdataset.Rows = append(newdataset.Rows, newrow)
+				newdataset.AppendNoRec(newrow)
 			}
 		}
 	}
@@ -335,12 +333,9 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 				// check whether there is unconsistence
 				flag := 0
 				for _, column := range commonattr {
-					if maplrow[column.Name] != "" {
-						if maprrow[column.Name] != "" {
-							if maplrow[column.Name] != maprrow[column.Name] {
-								flag ++
-							}
-						}
+					if maplrow[column.Name] != "" && maprrow[column.Name] != "" && maplrow[column.Name] != maprrow[column.Name] {
+						flag = 1
+						break
 					}
 				}
 				if flag == 0 {
@@ -379,7 +374,7 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 					fmt.Println("column = ", column)
 					lnewrow = append(lnewrow, "")
 				}
-				newdataset.Rows = append(newdataset.Rows, lnewrow)
+				newdataset.AppendNoRec(lnewrow)
 			}
 		}
 
@@ -402,12 +397,9 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 				// check whether there is unconsistence
 				flag := 0
 				for _, column := range commonattr {
-					if maprrow[column.Name] != "" {
-						if maplrow[column.Name] != "" {
-							if maprrow[column.Name] != maplrow[column.Name] {
-								flag ++
-							}
-						}
+					if maprrow[column.Name] != "" && maplrow[column.Name] != "" && maprrow[column.Name] != maplrow[column.Name] {
+						flag = 1
+						break
 					}
 				}
 				if flag == 0 {
@@ -428,7 +420,7 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 				for _, column := range remain[1] {
 					rnewrow = append(rnewrow, maprrow[column.Name])
 				}
-				newdataset.Rows = append(newdataset.Rows, rnewrow)
+				newdataset.AppendNoRec(rnewrow)
 			}
 		}
 		*reply = newdataset
