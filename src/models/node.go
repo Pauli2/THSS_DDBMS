@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"encoding/json"
 )
 
 // Node manages some tables defined in models/table.go
@@ -83,9 +84,89 @@ func (n *Node) UpdateConstrain(tableinfo []interface{}, reply *string) {
 	// update the rule in this node
 	tableName := tableinfo[0].(string)
 	tablerules := tableinfo[1].([]uint8)
-	fmt.Println("tablerules = ", string(tablerules))
+
 	if _, ok := n.TableMap[tableName]; ok {
-		n.Constrain[tableName] = tablerules
+		// if the table already exsits but there are new rules to be added?
+		// and the old rules are still needed? 
+		jsonoldrules := make(map[string]interface{})
+		jsonnewrules := make(map[string]interface{})
+		json.Unmarshal([]uint8(n.Constrain[tableName]), &jsonoldrules)
+		json.Unmarshal([]uint8(tablerules), &jsonnewrules)
+
+		fmt.Println("oldConstrain = ", jsonoldrules)
+		fmt.Println("newConstrain = ", jsonnewrules)
+
+		var tempcolumn []interface{}
+		// sign = true means the table is new, or the table already exists
+		var sign bool
+		if jsonoldrules["column"] == nil {
+			sign = true
+			fmt.Println("oldcolumn is empty")
+			tempcolumn, _ = jsonnewrules["column"].([]interface{})
+		} else {
+			sign = false
+			tempcolumn, _ = jsonoldrules["column"].([]interface{})
+			for _, clname := range jsonnewrules["column"].([]interface{}) {
+				var key bool
+				key = true
+				for _, oldclname := range jsonoldrules["column"].([]interface{}) {
+					if clname == oldclname {
+						key = false
+					}
+				}
+				if key {
+					tempcolumn = append(tempcolumn, clname)
+				}
+			}
+		}
+		fmt.Println("tempcolumn = ", tempcolumn)
+
+		newpredicate, _ := jsonnewrules["predicate"].(map[string]interface{})
+		temppredicate := make(map[string]interface{})
+		if sign {
+			temppredicate = newpredicate
+		} else {
+			oldpredicate, _ := jsonoldrules["predicate"].(map[string]interface{})
+			for field, expressions := range newpredicate {
+				fmt.Println("field = ", field)
+				fmt.Println("expressions = ", expressions)
+				if _, ok := oldpredicate[field]; ok {
+					fmt.Println("This field already exists.")
+					newexpressions, _ := oldpredicate[field].([]interface{})
+					for _, expression := range expressions.([]interface{}) {
+						fmt.Println("expression = ", expression)
+						jsonexpression, _ := expression.(map[string]interface{})
+						op, _ := jsonexpression["op"].(string)
+						val, _ := jsonexpression["val"].(float32)
+
+						nonrepeat := true
+						fmt.Println("nonrepeat = ", nonrepeat)
+						for _, oldexpression := range oldpredicate[field].([]interface{}) {
+							fmt.Println("oldexpression = ", oldexpression)
+							jsonoldexpression, _ := oldexpression.(map[string]interface{})
+							oldop, _ := jsonoldexpression["op"].(string)
+							oldval, _ := jsonoldexpression["val"].(float32)
+							if op == oldop && val == oldval {
+								nonrepeat = false
+							}
+						}
+						fmt.Println("nonrepeat = ", nonrepeat)
+						if nonrepeat {
+							newexpressions = append(newexpressions, expression)
+							fmt.Println("newexpressions = ", newexpressions)
+						}
+					}
+					temppredicate[field] = newexpressions
+				}
+			}
+		}
+		fmt.Println("temppredicate = ", temppredicate)
+
+		newConstrain := make(map[string]interface{})
+		newConstrain["column"] = tempcolumn
+		newConstrain["predicate"] = temppredicate
+
+		n.Constrain[tableName], _ = json.Marshal(newConstrain)
 		*reply = "update constrain of table " + tableName + " successfully"
 	} else {
 		*reply = "table " + tableName + " does not exsit"
@@ -171,7 +252,7 @@ func (n *Node) ScanTable(tableName string, dataset *Dataset) {
 	}
 }
 
-func (n *Node) CommonAttr (schemas []*TableSchema, results *[]ColumnSchema) {
+func (n *Node) CommonAttr(schemas []*TableSchema, results *[]ColumnSchema) {
 	*results = []ColumnSchema{}
 	lschema, rschema := schemas[0], schemas[1]
 	for _, lattrinfo := range lschema.ColumnSchemas {
@@ -183,7 +264,7 @@ func (n *Node) CommonAttr (schemas []*TableSchema, results *[]ColumnSchema) {
 	}
 }
 
-func (n *Node) JoinAttr (schemas []*TableSchema, commonattr *[]ColumnSchema, results *[]ColumnSchema) []([]ColumnSchema) {
+func (n *Node) JoinAttr(schemas []*TableSchema, commonattr *[]ColumnSchema, results *[]ColumnSchema) []([]ColumnSchema) {
 	lschema := schemas[0]
 	rschema := schemas[1]
 
@@ -193,8 +274,8 @@ func (n *Node) JoinAttr (schemas []*TableSchema, commonattr *[]ColumnSchema, res
 	lremain := []ColumnSchema{}
 	rremain := []ColumnSchema{}
 
-	fmt.Println("lsC = ", lschema.ColumnSchemas)
-	fmt.Println("rsC = ", rschema.ColumnSchemas)
+	// fmt.Println("lsC = ", lschema.ColumnSchemas)
+	// fmt.Println("rsC = ", rschema.ColumnSchemas)
 	for _, lattrinfo := range lschema.ColumnSchemas {
 		flag := 0
 		for _, cattrinfo := range *commonattr {
@@ -220,24 +301,24 @@ func (n *Node) JoinAttr (schemas []*TableSchema, commonattr *[]ColumnSchema, res
 			rremain = append(rremain, rattrinfo)
 		}
 	}
-	fmt.Println("lremain = ", lremain)
-	fmt.Println("rremain = ", rremain)
+	// fmt.Println("lremain = ", lremain)
+	// fmt.Println("rremain = ", rremain)
 	return []([]ColumnSchema){lremain, rremain}
 }
 
 func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
 	ltable, rtable := tables[0], tables[1]
-	fmt.Println("ltable = ", *ltable)
-	fmt.Println("rtable = ", *rtable)
+	// fmt.Println("ltable = ", *ltable)
+	// fmt.Println("rtable = ", *rtable)
 
 	commonattr := []ColumnSchema{}
 	n.CommonAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr)
-	fmt.Println("commonattr = ", commonattr)
+	// fmt.Println("commonattr = ", commonattr)
 
 	joinattr := []ColumnSchema{}
 	remain := n.JoinAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr, &joinattr)
-	fmt.Println("remain = ", remain)
-	fmt.Println("joinattr = ", joinattr)
+	// fmt.Println("remain = ", remain)
+	// fmt.Println("joinattr = ", joinattr)
 
 	newdataset := Dataset{}
 	newdataset.Schema.TableName = ""
@@ -249,14 +330,14 @@ func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
 		for index, column := range ltable.Schema.ColumnSchemas {
 			maplrow[column.Name] = lrow[index]
 		}
-		fmt.Println("maplrow = ", maplrow)
+		// fmt.Println("maplrow = ", maplrow)
 		for _, rrow := range rtable.Rows {
 			maprrow := make(map[string]interface{})
 			for index, column := range rtable.Schema.ColumnSchemas {
 				// fmt.Printf("type of rrow: %T\n", rrow[index])
 				maprrow[column.Name] = rrow[index]
 			}
-			fmt.Println("maprrow = ", maprrow)
+			// fmt.Println("maprrow = ", maprrow)
 
 			// row to insert
 			newrow := make(Row, 0)
@@ -293,8 +374,8 @@ func (n *Node) InnerJoin(tables []*Dataset, reply *Dataset) {
 
 func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 	ltable, rtable := tables[0], tables[1]
-	fmt.Println("ltable = ", *ltable)
-	fmt.Println("rtable = ", *rtable)
+	// fmt.Println("ltable = ", *ltable)
+	// fmt.Println("rtable = ", *rtable)
 
 	if len(ltable.Rows) == 0 {
 		*reply = *rtable
@@ -303,12 +384,12 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 	} else {
 		commonattr := []ColumnSchema{}
 		n.CommonAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr)
-		fmt.Println("commonattr = ", commonattr)
+		// fmt.Println("commonattr = ", commonattr)
 	
 		joinattr := []ColumnSchema{}
 		remain := n.JoinAttr([]*TableSchema{&ltable.Schema, &rtable.Schema}, &commonattr, &joinattr)
-		fmt.Println("remain = ", remain)
-		fmt.Println("joinattr = ", joinattr)
+		// fmt.Println("remain = ", remain)
+		// fmt.Println("joinattr = ", joinattr)
 
 		newdataset := Dataset{}
 		newdataset.Schema.TableName = ""
@@ -320,7 +401,7 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 			for index, column := range ltable.Schema.ColumnSchemas {
 				maplrow[column.Name] = lrow[index]
 			}
-			fmt.Println("maplrow = ", maplrow)
+			// fmt.Println("maplrow = ", maplrow)
 
 			consistence := 0
 			for _, rrow := range rtable.Rows {
@@ -328,7 +409,7 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 				for index, column := range rtable.Schema.ColumnSchemas {
 					maprrow[column.Name] = rrow[index]
 				}
-				fmt.Println("maprrow = ", maprrow)
+				// fmt.Println("maprrow = ", maprrow)
 
 				// check whether there is unconsistence
 				flag := 0
@@ -364,7 +445,7 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 				// row to insert
 				lnewrow := make(Row, 0)
 				for _, column := range commonattr {
-					fmt.Println("ccolumn = ", column)
+					// fmt.Println("ccolumn = ", column)
 					lnewrow = append(lnewrow, maplrow[column.Name])
 				}
 				for _, column := range remain[0] {
@@ -384,7 +465,7 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 			for index, column := range rtable.Schema.ColumnSchemas {
 				maprrow[column.Name] = rrow[index]
 			}
-			fmt.Println("maprrow = ", maprrow)
+			// fmt.Println("maprrow = ", maprrow)
 
 			consistence := 0
 			for _, lrow := range ltable.Rows {
@@ -392,7 +473,7 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 				for index, column := range ltable.Schema.ColumnSchemas {
 					maplrow[column.Name] = lrow[index]
 				}
-				fmt.Println("maplrow = ", maplrow)
+				// fmt.Println("maplrow = ", maplrow)
 
 				// check whether there is unconsistence
 				flag := 0
@@ -410,7 +491,7 @@ func (n *Node) OuterJoin(tables []*Dataset, reply *Dataset) {
 				// row to insert
 				rnewrow := make(Row, 0)
 				for _, column := range commonattr {
-					fmt.Println("ccolumn = ", column)
+					// fmt.Println("ccolumn = ", column)
 					rnewrow = append(rnewrow, maprrow[column.Name])
 				}
 				for _, column := range remain[0] {

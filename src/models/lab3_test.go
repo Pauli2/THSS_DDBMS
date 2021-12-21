@@ -4,7 +4,28 @@ import (
 	"../labrpc"
 	"encoding/json"
 	"testing"
+	"fmt"
 )
+
+const studentTableName = "student"
+const courseRegistrationTableName = "courseRegistration"
+
+var c *Cluster
+var network *labrpc.Network
+var cli *labrpc.ClientEnd
+
+var studentTableSchema *TableSchema
+var courseRegistrationTableSchema *TableSchema
+
+var studentRows []Row
+var courseRegistrationRows []Row
+
+var joinedTableSchema TableSchema
+var joinedTableContent []Row
+
+var studentTablePartitionRules []byte
+var courseRegistrationTablePartitionRules []byte
+
 func defineTablesLab3() {
 	studentTableSchema = &TableSchema{TableName: studentTableName, ColumnSchemas: []ColumnSchema{
 		{Name: "sid", DataType: TypeInt32},
@@ -68,6 +89,7 @@ func setupLab3() {
 
 // student table is held by three nodes and courseRegistration table is held by the last node
 func TestLab3NonOverlapping(t *testing.T) {
+	fmt.Println("Start Lab3_test.go TestLab3NonOverlapping")
 	setupLab3()
 
 	// use the client to create table and insert
@@ -99,6 +121,7 @@ func TestLab3NonOverlapping(t *testing.T) {
 		},
 	}
 	studentTablePartitionRules, _ = json.Marshal(m)
+	fmt.Println("m = ", m)
 
 	// assign course registration to node2
 	m = map[string]interface{}{
@@ -116,6 +139,7 @@ func TestLab3NonOverlapping(t *testing.T) {
 		},
 	}
 	courseRegistrationTablePartitionRules, _ = json.Marshal(m)
+	fmt.Println("m = ", m)
 
 	buildTablesLab3(cli)
 	insertDataLab3(cli)
@@ -134,6 +158,7 @@ func TestLab3NonOverlapping(t *testing.T) {
 
 // student table is held by node 0, 1, 2 and courseRegistration is held by node 0, 1, 2
 func TestLab3FullyOverlapping(t *testing.T) {
+	fmt.Println("Start Lab3_test.go TestLab3FullyOverlapping")
 	setupLab3()
 
 	// use the client to create table and insert
@@ -200,7 +225,8 @@ func TestLab3FullyOverlapping(t *testing.T) {
 
 // two tables are distributed to node0
 func TestLab3FullyCentralized(t *testing.T) {
-	setup()
+	fmt.Println("Start Lab3_test.go TestLab3FullyCentralized")
+	setupLab3()
 
 	// use the client to create table and insert
 	// divide student table into two partitions and assign them to node0 and node1
@@ -255,6 +281,7 @@ func TestLab3FullyCentralized(t *testing.T) {
 
 // student table is distributed to node0 and node1, courseRegistration table is distributed to node1 and node2
 func TestLab3PartiallyOverlapping(t *testing.T) {
+	fmt.Println("Start Lab3_test.go TestLab3PartiallyOverlapping")
 	setupLab3()
 
 	// use the client to create table and insert
@@ -333,6 +360,7 @@ func TestLab3PartiallyOverlapping(t *testing.T) {
 
 // courseRegistration table is empty in this test
 func TestLab3EmptyTable(t *testing.T) {
+	fmt.Println("Start Lab3_test.go TestLab3EmptyTable")
 	setupLab3()
 
 	courseRegistrationRows = []Row {}
@@ -414,6 +442,7 @@ func TestLab3EmptyTable(t *testing.T) {
 
 // there is no matching tuple in this test
 func TestLab3NoMatching(t *testing.T) {
+	fmt.Println("Start Lab3_test.go TestLab3NoMatching")
 	setupLab3()
 
 	courseRegistrationRows = []Row{
